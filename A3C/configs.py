@@ -9,8 +9,8 @@ if params.scenario == 'deadly_corridor':
     crop = (30,-35,1,-1)
     if params.actions=='all':
         action_size = 10
-    else:
-        action_size = 7
+    elif params.actions=='single':
+        action_size = 6
     s_size = np.prod(resize)
     
 elif params.scenario == 'basic':
@@ -18,7 +18,7 @@ elif params.scenario == 'basic':
     crop = (10,-10,30,-30)
     if params.actions=='all':
         action_size = 6
-    else:
+    elif params.actions=='single':
         action_size = 3
     s_size = np.prod(resize)
 
@@ -28,6 +28,6 @@ elif params.scenario == 'defend_the_center':
     crop = (40,-32,1,-1)
     if params.actions=='all':
         action_size = 6
-    else:
+    elif params.actions=='single':
         action_size = 3
     s_size = np.prod(resize)

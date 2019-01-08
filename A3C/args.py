@@ -9,7 +9,7 @@ def parse_arguments():
                         default="deadly_corridor", help="Doom scenario")
     parser.add_argument("--actions", type=str, 
                         choices=('all','single'), 
-                        default="all", help="Possible actions : 'all' for combinated actions and 'single' for single actions")
+                        default="single", help="Possible actions : 'all' for combinated actions and 'single' for single actions")
     parser.add_argument("--num_processes", type=int, default=-1, help="Number of processes for parallel algorithms  '-1' to use all available cpus")
     parser.add_argument("--model_path", type=str, default="./saves/model", help="Path to save models")
     parser.add_argument("--frames_path", type=str, default="./saves/frames", help="Path to save gifs")
