@@ -59,6 +59,16 @@ class Worker():
             for i in m_left_right:
                 for j in attack:
                     actions.append(i+j)
+         
+        if params.scenario=='defend_the_center':
+            for i in t_left_right:
+                for j in attack:
+                    actions.append(i+j)
+                    
+        if params.scenario=='defend_the_line':
+            for i in t_left_right:
+                for j in attack:
+                    actions.append(i+j)
             
         return actions
     
@@ -77,6 +87,10 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo = []
+            self.episode_kills = []
+        
+        if params.scenario=='defend_the_line':
+            self.episode_kills = []
     
     def update_containers(self):
         self.episode_rewards.append(self.episode_reward)
@@ -93,6 +107,10 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo.append(self.last_total_ammo2)
+            self.episode_kills.append(self.last_total_kills)
+        
+        if params.scenario=='defend_the_line':
+            self.episode_kills.append(self.last_total_kills)
             
     def update_summary(self):
         mean_reward = np.mean(self.episode_rewards[-params.freq_summary:])
@@ -118,7 +136,13 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             mean_ammo = np.mean(self.episode_ammo[-params.freq_summary:])
+            mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
             summary.value.add(tag='Perf/Ammo', simple_value=float(mean_ammo))
+            summary.value.add(tag='Perf/Kills', simple_value=float(mean_kills))
+            
+        if params.scenario=='defend_the_line':
+            mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
+            summary.value.add(tag='Perf/Kills', simple_value=float(mean_kills))
         
         summary.value.add(tag='Losses/Value Loss', simple_value=float(self.v_l))
         summary.value.add(tag='Losses/Policy Loss', simple_value=float(self.p_l))
@@ -163,16 +187,19 @@ class Worker():
             return 1
         
     def initialiaze_game_vars(self):
-        self.last_total_health = 100.0
-        self.last_total_ammo2 = 52  
-        self.last_total_kills = 0
+        self.last_total_health = self.env.get_game_variable(GameVariable.HEALTH)#100.0
+        self.last_total_ammo2 =self.env.get_game_variable(GameVariable.AMMO2)# 52 
+        self.last_total_kills = self.env.get_game_variable(GameVariable.KILLCOUNT)#0
     
     def get_custom_reward(self,game_reward):
         if params.scenario=='basic':
             return game_reward/100.0
         
         if params.scenario=='defend_the_center':
-            return game_reward + self.get_ammo_reward()/10
+            return game_reward + self.get_ammo_reward()/10 + 0*self.get_kill_reward()
+        
+        if params.scenario=='defend_the_line':
+            return game_reward + 0*self.get_kill_reward()
         
         if params.scenario=='deadly_corridor':
             return (game_reward/5 + self.get_health_reward() + self.get_kill_reward() + self.get_ammo_reward())/100.
@@ -195,8 +222,13 @@ class Worker():
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
         
         if params.scenario=='defend_the_center':
-            print('{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.episode_count, self.episode_reward, self.episode_step_count, 
+            print('{}, kills:{}, ammo:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
+                            self.name, self.last_total_kills, self.last_total_ammo2, self.episode_count, self.episode_reward, self.episode_step_count, 
+                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
+        
+        if params.scenario=='defend_the_line':
+            print('{}, kills:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
+                            self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_step_count, 
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
             
 
@@ -238,8 +270,10 @@ class Worker():
         self.episode_count = sess.run(self.global_episodes)
         total_steps = 0
         print ("Starting worker " + str(self.number))
-        with sess.as_default(), sess.graph.as_default():                 
-            while (not coord.should_stop()) and (self.episode_count<params.max_episodes):
+
+        with sess.as_default(), sess.graph.as_default():        
+            start_time = time.time()
+            while (not coord.should_stop()) and (self.episode_count<=params.max_episodes):
                 sess.run(self.update_local_ops)
                 episode_buffer = []
                 self.episode_values = []
@@ -292,7 +326,7 @@ class Worker():
                     
                     # If the episode hasn't ended, but the experience buffer is full (maximum steps), then we
                     # make an update step using that experience rollout.
-                    if len(episode_buffer) == params.n_steps and d != True and self.episode_step_count != max_episode_length - 1:
+                    if len(episode_buffer) == params.n_steps and d != True :
                         # Since we don't know what the true final return is, we "bootstrap" from our current
                         # value estimation.
                         v1 = sess.run(self.local_AC.value,
@@ -334,6 +368,7 @@ class Worker():
                     sess.run(self.increment)
                 
                 self.episode_count += 1
+            print("{} episodes done for {}. Time elapsed : {} s".format(self.episode_count, self.name, time.time() - start_time))
                 
     def play_game(self, sess, episode_num):
         if not isinstance(sess, tf.Session):
@@ -374,7 +409,7 @@ class Worker():
                        Current reward: {}'.format(step, self.env.get_game_variable(GameVariable.HEALTH), \
                                                   self.env.get_game_variable(GameVariable.KILLCOUNT), reward))
 
-            print('End episode: {}, Total Reward: {}, {}'.format(i, episode_rewards, last_total_shaping_reward))
+            print('End episode: {}, Total Reward: {}, {}'.format(i+1, episode_rewards, last_total_shaping_reward))
             print('time costs: {}'.format(time.time() - s_t))
             time.sleep(5)
             
