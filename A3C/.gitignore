@@ -26,11 +26,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-saves/model/
-A3C/saves/model/
-saves/frames/
-A3C/saves/frames/
-
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.

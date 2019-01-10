@@ -43,12 +43,7 @@ def train_agents():
         workers = []
         # Create worker classes
         for i in range(num_workers):
-            if params.scenario == "deadly_corridor":
-                trainer = tf.train.AdamOptimizer(learning_rate=params.lr)
-            elif params.scenario == "basic":
-                trainer = tf.train.AdamOptimizer(learning_rate=params.lr)
-            elif params.scenario == "defend_the_center":
-                trainer = tf.train.AdamOptimizer(learning_rate=params.lr)
+            trainer = tf.train.AdamOptimizer(learning_rate=params.lr)
             workers.append(Worker(DoomGame(), i, s_size, action_size, trainer, params.model_path, global_episodes))
         saver = tf.train.Saver(max_to_keep=5)
 
@@ -65,7 +60,7 @@ def train_agents():
         # Start the "work" process for each worker in a separate threat.
         worker_threads = []
         for worker in workers:
-            worker_work = lambda: worker.work(params.max_episode_length,params.gamma,sess,coord,saver)
+            worker_work = lambda: worker.work(params.max_episodes,params.gamma,sess,coord,saver)
             t = threading.Thread(target=(worker_work))
             t.start()
             sleep(0.5)
