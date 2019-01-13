@@ -26,7 +26,10 @@ class Worker():
 
         #Create the local copy of the network and the tensorflow op to copy global parameters to local network
         self.local_AC = AC_Network(s_size,action_size,self.name,trainer,as_player)
-        self.update_local_ops = update_target_graph('global',self.name)        
+        self.local_Pred = StateActionPredictor(s_size,action_size,self.name+"_P",trainer,as_player)
+        
+        self.update_local_ops = update_target_graph('global',self.name)
+        self.update_local_ops_P = update_target_graph('global_P',self.name+"_P")  
         
         #The Below code is related to setting up the Doom environment
         game.load_config("scenarios/"+params.scenario+".cfg")
@@ -59,16 +62,6 @@ class Worker():
             for i in m_left_right:
                 for j in attack:
                     actions.append(i+j)
-         
-        if params.scenario=='defend_the_center':
-            for i in t_left_right:
-                for j in attack:
-                    actions.append(i+j)
-                    
-        if params.scenario=='defend_the_line':
-            for i in t_left_right:
-                for j in attack:
-                    actions.append(i+j)
             
         return actions
     
@@ -87,10 +80,6 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo = []
-            self.episode_kills = []
-        
-        if params.scenario=='defend_the_line':
-            self.episode_kills = []
     
     def update_containers(self):
         self.episode_rewards.append(self.episode_reward)
@@ -107,10 +96,6 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo.append(self.last_total_ammo2)
-            self.episode_kills.append(self.last_total_kills)
-        
-        if params.scenario=='defend_the_line':
-            self.episode_kills.append(self.last_total_kills)
             
     def update_summary(self):
         mean_reward = np.mean(self.episode_rewards[-params.freq_summary:])
@@ -136,13 +121,7 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             mean_ammo = np.mean(self.episode_ammo[-params.freq_summary:])
-            mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
             summary.value.add(tag='Perf/Ammo', simple_value=float(mean_ammo))
-            summary.value.add(tag='Perf/Kills', simple_value=float(mean_kills))
-            
-        if params.scenario=='defend_the_line':
-            mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
-            summary.value.add(tag='Perf/Kills', simple_value=float(mean_kills))
         
         summary.value.add(tag='Losses/Value Loss', simple_value=float(self.v_l))
         summary.value.add(tag='Losses/Policy Loss', simple_value=float(self.p_l))
@@ -187,19 +166,16 @@ class Worker():
             return 1
         
     def initialiaze_game_vars(self):
-        self.last_total_health = self.env.get_game_variable(GameVariable.HEALTH)#100.0
-        self.last_total_ammo2 =self.env.get_game_variable(GameVariable.AMMO2)# 52 
-        self.last_total_kills = self.env.get_game_variable(GameVariable.KILLCOUNT)#0
+        self.last_total_health = 100.0
+        self.last_total_ammo2 = 52  
+        self.last_total_kills = 0
     
     def get_custom_reward(self,game_reward):
         if params.scenario=='basic':
             return game_reward/100.0
         
         if params.scenario=='defend_the_center':
-            return game_reward + self.get_ammo_reward()/10 + 0*self.get_kill_reward()
-        
-        if params.scenario=='defend_the_line':
-            return game_reward + 0*self.get_kill_reward()
+            return game_reward + self.get_ammo_reward()/10
         
         if params.scenario=='deadly_corridor':
             return (game_reward/5 + self.get_health_reward() + self.get_kill_reward() + self.get_ammo_reward())/100.
@@ -222,18 +198,13 @@ class Worker():
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
         
         if params.scenario=='defend_the_center':
-            print('{}, kills:{}, ammo:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.last_total_kills, self.last_total_ammo2, self.episode_count, self.episode_reward, self.episode_step_count, 
-                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
-        
-        if params.scenario=='defend_the_line':
-            print('{}, kills:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_step_count, 
+            print('{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
+                            self.name, self.episode_count, self.episode_reward, self.episode_step_count, 
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
             
 
     
-    def train(self,rollout,sess,gamma,bootstrap_value):
+    def train(self,rollout,a_dists_buffer,sess,gamma,bootstrap_value):
         rollout = np.array(rollout)
         
         observations, actions, rewards, next_observations, _, values = rollout.T
@@ -244,8 +215,7 @@ class Worker():
         self.rewards_plus = np.asarray(rewards.tolist() + [bootstrap_value])
         discounted_rewards = discount(self.rewards_plus,gamma)[:-1]
         self.value_plus = np.asarray(values.tolist() + [bootstrap_value])
-        advantages = rewards + gamma * self.value_plus[1:] - self.value_plus[:-1]
-        advantages = discount(advantages,gamma)
+        advantages = discounted_rewards - self.value_plus[:-1]
 
         # Update the local network using gradients from loss
         feed_dict = {self.local_AC.target_v:discounted_rewards,
@@ -254,6 +224,10 @@ class Worker():
                      self.local_AC.advantages:advantages,
                      self.local_AC.state_in[0]:self.batch_rnn_state[0],
                      self.local_AC.state_in[1]:self.batch_rnn_state[1]}
+        
+        feed_dict_P = {self.local_Pred.s1:np.vstack(observations),
+                       self.local_Pred.s2:np.vstack(next_observations),
+                       self.local_Pred.asample:a_dists_buffer}
         
         self.v_l,self.p_l,self.e_l,self.g_n,self.v_n, self.batch_rnn_state,_ = sess.run([self.local_AC.value_loss,
                                                                                          self.local_AC.policy_loss,
@@ -264,17 +238,22 @@ class Worker():
                                                                                          self.local_AC.apply_grads],
                                                                                         feed_dict=feed_dict)
         
-        return self.v_l / len(rollout),self.p_l / len(rollout),self.e_l / len(rollout), self.g_n,self.v_n
+        self.Inv_l, self.Forward_l, _ = sess.run([self.local_Pred.invloss,
+                                                  self.local_Pred.forwardloss,
+                                                  self.local_Pred.apply_grads],
+                                                 feed_dict=feed_dict_P)
+        
+        return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.Inv/ len(rollout), self.Forward_l/ len(rollout), self.g_n, self.v_n
         
     def work(self,max_episode_length,gamma,sess,coord,saver):
         self.episode_count = sess.run(self.global_episodes)
         total_steps = 0
         print ("Starting worker " + str(self.number))
-
-        with sess.as_default(), sess.graph.as_default():        
-            start_time = time.time()
-            while (not coord.should_stop()) and (self.episode_count<=params.max_episodes):
+        with sess.as_default(), sess.graph.as_default():                 
+            while (not coord.should_stop()) and (self.episode_count<params.max_episodes):
                 sess.run(self.update_local_ops)
+                sess.run(self.update_local_ops_P)
+                a_dists_buffer = []
                 episode_buffer = []
                 self.episode_values = []
                 episode_frames = []
@@ -303,6 +282,8 @@ class Worker():
                                                              self.local_AC.state_in[0]:rnn_state[0],
                                                              self.local_AC.state_in[1]:rnn_state[1]})
                     
+                    
+                    
                     action_index = self.choose_action_index(a_dist, deterministic=False)
 
                     r = self.get_custom_reward(self.env.make_action(self.actions[action_index], 2))
@@ -315,8 +296,11 @@ class Worker():
                         s1 = process_frame(s1, crop, resize)
                     else:
                         s1 = s
+                    
+                    curiosity = self.local_Pred.pred_bonus(s,s1,action_index)
                         
-                    episode_buffer.append([s,action_index,r,s1,d,v[0,0]])
+                    episode_buffer.append([s,action_index, r,s1,d,v[0,0]])
+                    a_dists_buffer.append([a_dist])
                     self.episode_values.append(v[0,0])
 
                     self.episode_reward += r
@@ -326,17 +310,21 @@ class Worker():
                     
                     # If the episode hasn't ended, but the experience buffer is full (maximum steps), then we
                     # make an update step using that experience rollout.
-                    if len(episode_buffer) == params.n_steps and d != True :
+                    if len(episode_buffer) == params.n_steps and d != True and self.episode_step_count != max_episode_length - 1:
                         # Since we don't know what the true final return is, we "bootstrap" from our current
                         # value estimation.
                         v1 = sess.run(self.local_AC.value,
                                       feed_dict={self.local_AC.inputs:[s],
                                                  self.local_AC.state_in[0]:rnn_state[0],
                                                  self.local_AC.state_in[1]:rnn_state[1]})[0,0]
-                        self.v_l,self.p_l,self.e_l,self.g_n,self.v_n = self.train(episode_buffer,sess,gamma,v1)
+                        self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer, 
+                                                                                                            a_dists_buffer, 
+                                                                                                            sess,gamma,v1)
                         episode_buffer = []
+                        a_dists_buffer = []
                         # Update the general network from the local network
                         sess.run(self.update_local_ops)
+                        sess.run(self.update_local_ops_P)
                     if d == True:
                         # Print perfs of episode
                         self.print_end_episode_perfs()
@@ -347,7 +335,7 @@ class Worker():
                 
                 # Update the network using the episode buffer at the end of the episode.
                 if len(episode_buffer) != 0:
-                    self.v_l,self.p_l,self.e_l,self.g_n,self.v_n = self.train(episode_buffer,sess,gamma,0.0)
+                    self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,sess,gamma,0.0)
                                 
                     
                 # Periodically save gifs of episodes, model parameters, and summary statistics.                    
@@ -368,7 +356,6 @@ class Worker():
                     sess.run(self.increment)
                 
                 self.episode_count += 1
-            print("{} episodes done for {}. Time elapsed : {} s".format(self.episode_count, self.name, time.time() - start_time))
                 
     def play_game(self, sess, episode_num):
         if not isinstance(sess, tf.Session):
@@ -409,7 +396,7 @@ class Worker():
                        Current reward: {}'.format(step, self.env.get_game_variable(GameVariable.HEALTH), \
                                                   self.env.get_game_variable(GameVariable.KILLCOUNT), reward))
 
-            print('End episode: {}, Total Reward: {}, {}'.format(i+1, episode_rewards, last_total_shaping_reward))
+            print('End episode: {}, Total Reward: {}, {}'.format(i, episode_rewards, last_total_shaping_reward))
             print('time costs: {}'.format(time.time() - s_t))
             time.sleep(5)
             
