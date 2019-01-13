@@ -13,8 +13,8 @@ class AC_Network():
             #Input and visual encoding layers
             self.inputs = tf.placeholder(shape=[None,s_size],dtype=tf.float32)
             self.imageIn = tf.reshape(self.inputs,shape=[-1,resize0,resize1,1])
-            self.conv1 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.imageIn,num_outputs=16,kernel_size=[8,8],stride=[4,4],padding='VALID')
-            self.conv2 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.conv1,num_outputs=32, kernel_size=[4,4],stride=[2,2],padding='VALID')
+            self.conv1 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.imageIn,num_outputs=16, kernel_size=[8,8], stride=[4,4], padding='VALID')
+            self.conv2 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.conv1,num_outputs=32, kernel_size=[4,4],stride=[2,2], padding='VALID')
             hidden = slim.fully_connected(slim.flatten(self.conv2),256,activation_fn=tf.nn.elu)
             
             #Recurrent network for temporal dependencies
@@ -28,9 +28,12 @@ class AC_Network():
             rnn_in = tf.expand_dims(hidden, [0])
             step_size = tf.shape(self.imageIn)[:1]
             state_in = tf.contrib.rnn.LSTMStateTuple(c_in, h_in)
+            
             lstm_outputs, lstm_state = tf.nn.dynamic_rnn(lstm_cell, rnn_in, initial_state=state_in, sequence_length=step_size,time_major=False)
             lstm_c, lstm_h = lstm_state
+            
             self.state_out = (lstm_c[:1, :], lstm_h[:1, :])
+            
             rnn_out = tf.reshape(lstm_outputs, [-1, 256])
             
             #Output layers for policy and value estimations
@@ -69,9 +72,99 @@ class AC_Network():
                 #Apply local gradients to global network
                 global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
                 self.apply_grads = trainer.apply_gradients(zip(grads,global_vars))
-                
-                
+
+def doomHead(x):
+    ''' Learning by Prediction ICLR 2017 paper
+        (their final output was 64 changed to 256 here)
+        input: [None, 120, 160, 1]; output: [None, 1280] -> [None, 256];
+    '''
+    print('Using doom head design')
+    x = tf.nn.elu(conv2d(x, 8, "l1", [5, 5], [4, 4]))
+    x = tf.nn.elu(conv2d(x, 16, "l2", [3, 3], [2, 2]))
+    x = tf.nn.elu(conv2d(x, 32, "l3", [3, 3], [2, 2]))
+    x = tf.nn.elu(conv2d(x, 64, "l4", [3, 3], [2, 2]))
+    x = flatten(x)
+    x = tf.nn.elu(linear(x, 256, "fc", normalized_columns_initializer(0.01)))
+    return x
+
 class StateActionPredictor(object):
+    def __init__(self, ob_space, ac_space, scope, trainer, as_player=False):
+        with tf.variable_scope(scope):
+            # input: s1,s2: : [None, h, w, ch] (usually ch=1 or 4)
+            # asample: 1-hot encoding of sampled action from policy: [None, ac_space]
+            input_shape = [None] + list(ob_space)
+            self.s1 = phi1 = tf.placeholder(tf.float32, input_shape)
+            self.s2 = phi2 = tf.placeholder(tf.float32, input_shape)
+            self.asample = asample = tf.placeholder(tf.float32, [None, ac_space])
+
+            # feature encoding: phi1, phi2: [None, LEN]
+            size = 256
+            phi1 = doomHead(phi1)
+            with tf.variable_scope(tf.get_variable_scope(), reuse=True):
+                phi2 = doomHead(phi2)
+
+            # inverse model: g(phi1,phi2) -> a_inv: [None, ac_space]
+            g = tf.concat(1,[phi1, phi2])
+            g = tf.nn.relu(linear(g, size, "g1", normalized_columns_initializer(0.01)))
+            aindex = tf.argmax(asample, axis=1)  # aindex: [batch_size,]
+            logits = linear(g, ac_space, "glast", normalized_columns_initializer(0.01))
+            self.invloss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
+                                            logits, aindex), name="invloss")
+            self.ainvprobs = tf.nn.softmax(logits, dim=-1)
+
+            # forward model: f(phi1,asample) -> phi2
+            # Note: no backprop to asample of policy: it is treated as fixed for predictor training
+            f = tf.concat(1, [phi1, asample])
+            f = tf.nn.relu(linear(f, size, "f1", normalized_columns_initializer(0.01)))
+            f = linear(f, phi1.get_shape()[1].value, "flast", normalized_columns_initializer(0.01))
+            self.forwardloss = 0.5 * tf.reduce_mean(tf.square(tf.subtract(f, phi2)), name='forwardloss')
+            # self.forwardloss = 0.5 * tf.reduce_mean(tf.sqrt(tf.abs(tf.subtract(f, phi2))), name='forwardloss')
+            # self.forwardloss = cosineLoss(f, phi2, name='forwardloss')
+            self.forwardloss = self.forwardloss * phi1.get_shape()[1].value  # lenFeatures=288. Factored out to make hyperparams not depend on it.
+            
+            beta = constants['FORWARD_LOSS_WT']
+            lr_pred = constants['PREDICTION_LR_SCALE']
+            self.loss = lr_pred*(beta*self.forwardloss + (1-beta)*self.invloss)
+
+            # variable list
+            if (scope != 'global_P') and (not as_player):
+                #Get gradients from local network using local losses
+                local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
+                self.gradients = tf.gradients(self.loss,local_vars)
+                self.var_norms = tf.global_norm(local_vars)
+                grads,self.grad_norms = tf.clip_by_global_norm(self.gradients,40.0)
+
+                #Apply local gradients to global network
+                global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global_P')
+                self.apply_grads = trainer.apply_gradients(zip(grads,global_vars))
+
+
+    def pred_act(self, s1, s2):
+        '''
+        returns action probability distribution predicted by inverse model
+            input: s1,s2: [h, w, ch]
+            output: ainvprobs: [ac_space]
+        '''
+        sess = tf.get_default_session()
+        return sess.run(self.ainvprobs, {self.s1: [s1], self.s2: [s2]})[0, :]
+
+    def pred_bonus(self, s1, s2, asample):
+        '''
+        returns bonus predicted by forward model
+            input: s1,s2: [h, w, ch], asample: [ac_space] 1-hot encoding
+            output: scalar bonus
+        '''
+        sess = tf.get_default_session()
+        # error = sess.run([self.forwardloss, self.invloss],
+        #     {self.s1: [s1], self.s2: [s2], self.asample: [asample]})
+        # print('ErrorF: ', error[0], ' ErrorI:', error[1])
+        error = sess.run(self.forwardloss,
+            {self.s1: [s1], self.s2: [s2], self.asample: [asample]})
+        error = error * constants['PREDICTION_BETA']
+        return error
+    
+    
+class StateActionPredictor_origin(object):
     def __init__(self, ob_space, ac_space, scope, designHead='doom'):
         with tf.variable_scope(scope):
             # input: s1,s2: : [None, h, w, ch] (usually ch=1 or 4)
