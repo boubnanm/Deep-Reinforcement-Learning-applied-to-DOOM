@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import numpy as np
+from constants import constants
 
 from configs import *
 from utils import *
@@ -132,8 +133,12 @@ class StateActionPredictor(object):
             input_shape = [None,ob_space]# + list(ob_space)
             self.s1 = phi1 = tf.placeholder(tf.float32, input_shape)
             self.s2 = phi2 = tf.placeholder(tf.float32, input_shape)
-            self.asample = asample = tf.placeholder(tf.float32, [None, ac_space])
+#             self.asample = asample = tf.placeholder(tf.float32, [None, ac_space]) 
+            self.aindex = aindex = tf.placeholder(shape=[None],dtype=tf.int32)
+#             self.actions_onehot = tf.one_hot(self.aindex,ac_space,dtype=tf.float32)
+            self.asample = asample = tf.one_hot(self.aindex,ac_space,dtype=tf.float32)
 
+    
             # feature encoding: phi1, phi2: [None, LEN]
             size = 256
             phi1 = doomHead2(phi1)#doomHead(phi1)
@@ -141,19 +146,19 @@ class StateActionPredictor(object):
             phi2 = doomHead2(phi2)#doomHead(phi2)
 
             # inverse model: g(phi1,phi2) -> a_inv: [None, ac_space]
-#             print("BOUUUUUUUU",phi1.shape)
-#             print("BOUUUUUUUU",phi2.shape)
             g = tf.concat([phi1, phi2],1)
-#             print("BAAAA", tf.shape)
             g = tf.nn.relu(linear(g, size, "g1", normalized_columns_initializer(0.01)))
-            aindex = tf.argmax(asample, axis=1)  # aindex: [batch_size,]
             logits = linear(g, ac_space, "glast", normalized_columns_initializer(0.01))
-            self.invloss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits, aindex), name="invloss")
             self.ainvprobs = tf.nn.softmax(logits, dim=-1)
+            
+#             aindex = tf.argmax(asample, axis=1)  # aindex: [batch_size,]
+            
+            self.invloss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=aindex), name="invloss")
+            
 
             # forward model: f(phi1,asample) -> phi2
             # Note: no backprop to asample of policy: it is treated as fixed for predictor training
-            f = tf.concat(1, [phi1, asample])
+            f = tf.concat([phi1, asample], 1)
             f = tf.nn.relu(linear(f, size, "f1", normalized_columns_initializer(0.01)))
             f = linear(f, phi1.get_shape()[1].value, "flast", normalized_columns_initializer(0.01))
             self.forwardloss = 0.5 * tf.reduce_mean(tf.square(tf.subtract(f, phi2)), name='forwardloss')

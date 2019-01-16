@@ -40,3 +40,12 @@ elif params.scenario == 'defend_the_line':
     elif params.actions=='single':
         action_size = 3
     s_size = np.prod(resize)
+    
+elif params.scenario == 'my_way_home':
+    resize = (84,112)
+    crop = (1,-1,1,-1)
+    if params.actions=='all':
+        action_size = 5
+    elif params.actions=='single':
+        action_size = 3
+    s_size = np.prod(resize)

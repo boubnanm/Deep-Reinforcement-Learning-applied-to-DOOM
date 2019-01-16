@@ -62,11 +62,17 @@ class Worker():
             for i in m_left_right:
                 for j in attack:
                     actions.append(i+j)
+                    
+        if params.scenario=='my_way_home':
+            actions = np.identity(3,dtype=int).tolist()
+            actions.extend([[1, 0, 1],
+                            [0, 1, 1]])
             
         return actions
     
     def initialize_containers(self):
         self.episode_rewards = []
+        self.episode_curiosities = []
         self.episode_lengths = []
         self.episode_mean_values = []
         
@@ -83,6 +89,7 @@ class Worker():
     
     def update_containers(self):
         self.episode_rewards.append(self.episode_reward)
+        self.episode_curiosities.append(self.episode_curiosity)
         self.episode_lengths.append(self.episode_step_count)
         self.episode_mean_values.append(np.mean(self.episode_values))
         
@@ -99,6 +106,7 @@ class Worker():
             
     def update_summary(self):
         mean_reward = np.mean(self.episode_rewards[-params.freq_summary:])
+        mean_curiosity = np.mean(self.episode_curiosities[-params.freq_summary:])
         mean_length = np.mean(self.episode_lengths[-params.freq_summary:])
         mean_value = np.mean(self.episode_mean_values[-params.freq_summary:])
                     
@@ -106,6 +114,7 @@ class Worker():
         summary.value.add(tag='Perf/Episode_Length', simple_value=float(mean_length))
         summary.value.add(tag='Perf/Value', simple_value=float(mean_value))
         summary.value.add(tag='Perf/Reward', simple_value=float(mean_reward))
+        summary.value.add(tag='Perf/Curiosity', simple_value=float(mean_curiosity))
         
         if params.scenario=='deadly_corridor':
             mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
@@ -179,6 +188,12 @@ class Worker():
         
         if params.scenario=='deadly_corridor':
             return (game_reward/5 + self.get_health_reward() + self.get_kill_reward() + self.get_ammo_reward())/100.
+        
+        if params.scenario=='my_way_home':
+            return game_reward
+        
+        else:
+            return game_reward
     
     def choose_action_index(self, policy, deterministic=False):
         if deterministic:
@@ -200,6 +215,11 @@ class Worker():
         if params.scenario=='defend_the_center':
             print('{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
                             self.name, self.episode_count, self.episode_reward, self.episode_step_count, 
+                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
+                          
+        if params.scenario=='my_way_home':
+            print('{}, episode #{}, ep_reward: {}, ep_curiosity: {}, steps:{}, av_reward:{}, time costs:{}'.format(
+                            self.name, self.episode_count, self.episode_reward, self.episode_curiosity, self.episode_step_count, 
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
             
 
@@ -227,7 +247,8 @@ class Worker():
         
         feed_dict_P = {self.local_Pred.s1:np.vstack(observations),
                        self.local_Pred.s2:np.vstack(next_observations),
-                       self.local_Pred.asample:a_dists_buffer}
+                       self.local_Pred.asample:np.vstack(a_dists_buffer),
+                       self.local_Pred.aindex:actions}
         
         self.v_l,self.p_l,self.e_l,self.g_n,self.v_n, self.batch_rnn_state,_ = sess.run([self.local_AC.value_loss,
                                                                                          self.local_AC.policy_loss,
@@ -243,7 +264,7 @@ class Worker():
                                                   self.local_Pred.apply_grads],
                                                  feed_dict=feed_dict_P)
         
-        return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.Inv/ len(rollout), self.Forward_l/ len(rollout), self.g_n, self.v_n
+        return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.Inv_l/ len(rollout), self.Forward_l/ len(rollout), self.g_n, self.v_n
         
     def work(self,max_episode_length,gamma,sess,coord,saver):
         self.episode_count = sess.run(self.global_episodes)
@@ -255,9 +276,11 @@ class Worker():
                 sess.run(self.update_local_ops_P)
                 a_dists_buffer = []
                 episode_buffer = []
-                self.episode_values = []
                 episode_frames = []
+                
+                self.episode_values = []        
                 self.episode_reward = 0
+                self.episode_curiosity = 0
                 self.episode_step_count = 0
                 d = False
                 
@@ -286,7 +309,7 @@ class Worker():
                     
                     action_index = self.choose_action_index(a_dist, deterministic=False)
 
-                    r = self.get_custom_reward(self.env.make_action(self.actions[action_index], 2))
+                    reward = self.get_custom_reward(self.env.make_action(self.actions[action_index], 2))
 
                     d = self.env.is_episode_finished()
                     
@@ -297,13 +320,16 @@ class Worker():
                     else:
                         s1 = s
                     
-                    curiosity = self.local_Pred.pred_bonus(s,s1,action_index)
+                    curiosity = self.local_Pred.pred_bonus(s,s1,a_dist[0])
+                    
+                    r = curiosity + reward
                         
                     episode_buffer.append([s,action_index, r,s1,d,v[0,0]])
-                    a_dists_buffer.append([a_dist])
+                    a_dists_buffer.append([a_dist[0]])
                     self.episode_values.append(v[0,0])
 
                     self.episode_reward += r
+                    self.episode_curiosity += curiosity
                     s = s1                    
                     total_steps += 1
                     self.episode_step_count += 1
@@ -335,7 +361,7 @@ class Worker():
                 
                 # Update the network using the episode buffer at the end of the episode.
                 if len(episode_buffer) != 0:
-                    self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,sess,gamma,0.0)
+                    self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,a_dists_buffer,sess,gamma,0.0)
                                 
                     
                 # Periodically save gifs of episodes, model parameters, and summary statistics.                    
