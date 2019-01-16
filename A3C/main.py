@@ -14,5 +14,4 @@ if __name__ == '__main__':
         play_with_agent(params)
     else:
         train_agents()
-        os.system("sudo shutdown -h now")
         
