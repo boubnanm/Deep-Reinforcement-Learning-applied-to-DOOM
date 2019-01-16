@@ -12,7 +12,8 @@ def parse_arguments():
     parser.add_argument("--model_path", type=str, default="./saves/model", help="Path to save models")
     parser.add_argument("--frames_path", type=str, default="./saves/frames", help="Path to save gifs")
     parser.add_argument("--summary_path", type=str, default="./saves/summary", help="Path to save training summary")
-    parser.add_argument("--load_model", type=int, default=0, help="Either to load model or not")
+    parser.add_argument("--load_model", action="store_true", help="Either to load model or not")
+    # type=int, default=0, help="Either to load model or not")
     parser.add_argument("--max_episodes", type=int, default=1600, help="Maximum episodes per worker")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
@@ -22,11 +23,19 @@ def parse_arguments():
     parser.add_argument("--freq_model_save", type=int, default=200, help="Frequence of episodes to save model")
     parser.add_argument("--freq_gif_save", type=int, default=25, help="Frequence of episodes to save gifs")
     parser.add_argument("--freq_summary", type=int, default=5, help="Frequence of episodes to save gifs")
+    parser.add_argument("--use_curiosity", action="store_true", help="Frequence of episodes to save gifs")
+    parser.add_argument("--no_render", action="store_true", help="Frequence of episodes to save gifs")
+
 
     game_args, _ = parser.parse_known_args()
     
     game_args.model_path += "/"+game_args.scenario
     game_args.frames_path += "/"+game_args.scenario
     game_args.summary_path += "/"+game_args.scenario
+    
+    if game_args.use_curiosity:
+        game_args.model_path += "_curiosity"
+        game_args.frames_path += "_curiosity"
+        game_args.summary_path += "_curiosity"
     
     return game_args

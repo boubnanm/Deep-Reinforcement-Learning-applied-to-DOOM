@@ -25,15 +25,18 @@ class Worker():
             self.summary_writer = tf.summary.FileWriter(params.summary_path+"/train_"+str(self.number))
 
         #Create the local copy of the network and the tensorflow op to copy global parameters to local network
-        self.local_AC = AC_Network(s_size,action_size,self.name,trainer,as_player)
-        self.local_Pred = StateActionPredictor(s_size,action_size,self.name+"_P",trainer,as_player)
-        
+        self.local_AC = AC_Network(s_size,action_size,self.name,trainer,as_player) 
         self.update_local_ops = update_target_graph('global',self.name)
-        self.update_local_ops_P = update_target_graph('global_P',self.name+"_P")  
+        
+        if params.use_curiosity:
+            self.local_Pred = StateActionPredictor(s_size,action_size,self.name+"_P",trainer,as_player)
+            self.update_local_ops_P = update_target_graph('global_P',self.name+"_P")  
         
         #The Below code is related to setting up the Doom environment
         game.load_config("scenarios/"+params.scenario+".cfg")
         game.set_doom_scenario_path("scenarios/"+params.scenario+".wad") #This corresponds to the simple task we will pose our agent
+        if params.no_render:
+            game.set_window_visible(False)
 
         game.init()
         if params.actions=='all' :
@@ -68,6 +71,16 @@ class Worker():
             actions.extend([[1, 0, 1],
                             [0, 1, 1]])
             
+        if params.scenario=='defend_the_center':
+            for i in t_left_right:
+                for j in attack:
+                    actions.append(i+j)
+        
+        if params.scenario=='defend_the_line':
+            for i in t_left_right:
+                for j in attack:
+                    actions.append(i+j)
+            
         return actions
     
     def initialize_containers(self):
@@ -89,9 +102,11 @@ class Worker():
     
     def update_containers(self):
         self.episode_rewards.append(self.episode_reward)
-        self.episode_curiosities.append(self.episode_curiosity)
         self.episode_lengths.append(self.episode_step_count)
         self.episode_mean_values.append(np.mean(self.episode_values))
+        
+        if params.use_curiosity:
+            self.episode_curiosities.append(self.episode_curiosity)
         
         if params.scenario=='deadly_corridor':
             self.episode_kills.append(self.last_total_kills)
@@ -106,15 +121,18 @@ class Worker():
             
     def update_summary(self):
         mean_reward = np.mean(self.episode_rewards[-params.freq_summary:])
-        mean_curiosity = np.mean(self.episode_curiosities[-params.freq_summary:])
         mean_length = np.mean(self.episode_lengths[-params.freq_summary:])
         mean_value = np.mean(self.episode_mean_values[-params.freq_summary:])
+        
+        if params.use_curiosity:
+            mean_curiosity = np.mean(self.episode_curiosities[-params.freq_summary:])
                     
         summary = tf.Summary()
         summary.value.add(tag='Perf/Episode_Length', simple_value=float(mean_length))
         summary.value.add(tag='Perf/Value', simple_value=float(mean_value))
         summary.value.add(tag='Perf/Reward', simple_value=float(mean_reward))
-        summary.value.add(tag='Perf/Curiosity', simple_value=float(mean_curiosity))
+        if params.use_curiosity:
+            summary.value.add(tag='Perf/Curiosity', simple_value=float(mean_curiosity))
         
         if params.scenario=='deadly_corridor':
             mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
@@ -137,6 +155,10 @@ class Worker():
         summary.value.add(tag='Losses/Entropy', simple_value=float(self.e_l))
         summary.value.add(tag='Losses/Grad Norm', simple_value=float(self.g_n))
         summary.value.add(tag='Losses/Var Norm', simple_value=float(self.v_n))
+        if params.use_curiosity:
+            summary.value.add(tag='Losses/Inverse Loss', simple_value=float(self.Inv_l))
+            summary.value.add(tag='Losses/Forward Loss', simple_value=float(self.Forward_l))
+            
         
         self.summary_writer.add_summary(summary, self.episode_count)
         self.summary_writer.flush()
@@ -245,10 +267,7 @@ class Worker():
                      self.local_AC.state_in[0]:self.batch_rnn_state[0],
                      self.local_AC.state_in[1]:self.batch_rnn_state[1]}
         
-        feed_dict_P = {self.local_Pred.s1:np.vstack(observations),
-                       self.local_Pred.s2:np.vstack(next_observations),
-                       self.local_Pred.asample:np.vstack(a_dists_buffer),
-                       self.local_Pred.aindex:actions}
+
         
         self.v_l,self.p_l,self.e_l,self.g_n,self.v_n, self.batch_rnn_state,_ = sess.run([self.local_AC.value_loss,
                                                                                          self.local_AC.policy_loss,
@@ -258,13 +277,20 @@ class Worker():
                                                                                          self.local_AC.state_out,
                                                                                          self.local_AC.apply_grads],
                                                                                         feed_dict=feed_dict)
+        if params.use_curiosity:
+            feed_dict_P = {self.local_Pred.s1:np.vstack(observations),
+                           self.local_Pred.s2:np.vstack(next_observations),
+                           self.local_Pred.asample:np.vstack(a_dists_buffer),
+                           self.local_Pred.aindex:actions}        
+            
+            self.Inv_l, self.Forward_l, _ = sess.run([self.local_Pred.invloss,
+                                                      self.local_Pred.forwardloss,
+                                                      self.local_Pred.apply_grads],
+                                                     feed_dict=feed_dict_P)
+            
+            return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.Inv_l/ len(rollout), self.Forward_l/ len(rollout), self.g_n, self.v_n
         
-        self.Inv_l, self.Forward_l, _ = sess.run([self.local_Pred.invloss,
-                                                  self.local_Pred.forwardloss,
-                                                  self.local_Pred.apply_grads],
-                                                 feed_dict=feed_dict_P)
-        
-        return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.Inv_l/ len(rollout), self.Forward_l/ len(rollout), self.g_n, self.v_n
+        return self.v_l / len(rollout), self.p_l / len(rollout), self.e_l / len(rollout), self.g_n, self.v_n
         
     def work(self,max_episode_length,gamma,sess,coord,saver):
         self.episode_count = sess.run(self.global_episodes)
@@ -273,7 +299,8 @@ class Worker():
         with sess.as_default(), sess.graph.as_default():                 
             while (not coord.should_stop()) and (self.episode_count<params.max_episodes):
                 sess.run(self.update_local_ops)
-                sess.run(self.update_local_ops_P)
+                if params.use_curiosity:
+                    sess.run(self.update_local_ops_P)
                 a_dists_buffer = []
                 episode_buffer = []
                 episode_frames = []
@@ -320,7 +347,11 @@ class Worker():
                     else:
                         s1 = s
                     
-                    curiosity = self.local_Pred.pred_bonus(s,s1,a_dist[0])
+                    if params.use_curiosity:
+                        curiosity = self.local_Pred.pred_bonus(s,s1,a_dist[0])
+                        self.episode_curiosity += curiosity
+                    else:
+                        curiosity = 0
                     
                     r = curiosity + reward
                         
@@ -329,7 +360,7 @@ class Worker():
                     self.episode_values.append(v[0,0])
 
                     self.episode_reward += r
-                    self.episode_curiosity += curiosity
+                    
                     s = s1                    
                     total_steps += 1
                     self.episode_step_count += 1
@@ -343,14 +374,26 @@ class Worker():
                                       feed_dict={self.local_AC.inputs:[s],
                                                  self.local_AC.state_in[0]:rnn_state[0],
                                                  self.local_AC.state_in[1]:rnn_state[1]})[0,0]
-                        self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer, 
-                                                                                                            a_dists_buffer, 
-                                                                                                            sess,gamma,v1)
+                        
+                        if params.use_curiosity:
+                            self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,
+                                                                                                                a_dists_buffer,
+                                                                                                                sess,
+                                                                                                                gamma,
+                                                                                                                v1)
+                        
+                        else :
+                            self.v_l,self.p_l,self.e_l,self.g_n,self.v_n = self.train(episode_buffer,
+                                                                                      a_dists_buffer,
+                                                                                      sess,
+                                                                                      gamma,
+                                                                                      v1)
                         episode_buffer = []
                         a_dists_buffer = []
                         # Update the general network from the local network
                         sess.run(self.update_local_ops)
-                        sess.run(self.update_local_ops_P)
+                        if params.use_curiosity:
+                            sess.run(self.update_local_ops_P)
                     if d == True:
                         # Print perfs of episode
                         self.print_end_episode_perfs()
@@ -361,7 +404,18 @@ class Worker():
                 
                 # Update the network using the episode buffer at the end of the episode.
                 if len(episode_buffer) != 0:
-                    self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,a_dists_buffer,sess,gamma,0.0)
+                    if params.use_curiosity:
+                        self.v_l,self.p_l,self.e_l,self.Inv_l,self.Forward_l,self.g_n,self.v_n = self.train(episode_buffer,
+                                                                                                            a_dists_buffer,
+                                                                                                            sess,gamma,
+                                                                                                            0.0)
+                    else :
+                        self.v_l,self.p_l,self.e_l,self.g_n,self.v_n = self.train(episode_buffer,
+                                                                                  a_dists_buffer,
+                                                                                  sess,
+                                                                                  gamma,
+                                                                                  0.0)
+                        
                                 
                     
                 # Periodically save gifs of episodes, model parameters, and summary statistics.                    
@@ -382,6 +436,8 @@ class Worker():
                     sess.run(self.increment)
                 
                 self.episode_count += 1
+                
+            print("{} finished {} episodes. Going to sleep ..".format(self.name, self.episode_count))
                 
     def play_game(self, sess, episode_num):
         if not isinstance(sess, tf.Session):

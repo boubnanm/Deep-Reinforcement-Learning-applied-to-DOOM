@@ -36,7 +36,8 @@ def train_agents():
         global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
         
         master_network = AC_Network(s_size,action_size,'global',None) # Generate global AC network
-        master_network_P = StateActionPredictor(s_size,action_size,'global_P',None) # Generate global AC network
+        if params.use_curiosity:
+            master_network_P = StateActionPredictor(s_size,action_size,'global_P',None) # Generate global AC network
         if params.num_processes==-1:
             num_workers = multiprocessing.cpu_count() # Set workers to number of available CPU threads
         else:
