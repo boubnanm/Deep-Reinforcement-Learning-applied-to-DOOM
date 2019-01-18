@@ -83,6 +83,11 @@ class Worker():
             
         return actions
     
+    def initialiaze_game_vars(self):
+        self.last_total_health = 100.0
+        self.last_total_ammo2 = 52  
+        self.last_total_kills = 0
+    
     def initialize_containers(self):
         self.episode_rewards = []
         self.episode_curiosities = []
@@ -99,6 +104,7 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo = []
+            self.episode_kills = []
     
     def update_containers(self):
         self.episode_rewards.append(self.episode_reward)
@@ -118,6 +124,7 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             self.episode_ammo.append(self.last_total_ammo2)
+            self.episode_kills.append(self.last_total_kills)
             
     def update_summary(self):
         mean_reward = np.mean(self.episode_rewards[-params.freq_summary:])
@@ -148,7 +155,9 @@ class Worker():
         
         if params.scenario=='defend_the_center':
             mean_ammo = np.mean(self.episode_ammo[-params.freq_summary:])
+            mean_kills = np.mean(self.episode_kills[-params.freq_summary:])
             summary.value.add(tag='Perf/Ammo', simple_value=float(mean_ammo))
+            summary.value.add(tag='Perf/Kills', simple_value=float(mean_kills))
         
         summary.value.add(tag='Losses/Value Loss', simple_value=float(self.v_l))
         summary.value.add(tag='Losses/Policy Loss', simple_value=float(self.p_l))
@@ -195,17 +204,13 @@ class Worker():
             return 2
         else:
             return 1
-        
-    def initialiaze_game_vars(self):
-        self.last_total_health = 100.0
-        self.last_total_ammo2 = 52  
-        self.last_total_kills = 0
     
     def get_custom_reward(self,game_reward):
         if params.scenario=='basic':
             return game_reward/100.0
         
         if params.scenario=='defend_the_center':
+            self.last_total_kills = self.env.get_game_variable(GameVariable.KILLCOUNT)
             return game_reward + self.get_ammo_reward()/10
         
         if params.scenario=='deadly_corridor':
@@ -235,8 +240,8 @@ class Worker():
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
         
         if params.scenario=='defend_the_center':
-            print('{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.episode_count, self.episode_reward, self.episode_step_count, 
+            print('{}, kills:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
+                            self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_step_count, 
                             self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
                           
         if params.scenario=='my_way_home':
@@ -335,8 +340,11 @@ class Worker():
                     
                     
                     action_index = self.choose_action_index(a_dist, deterministic=False)
-
-                    reward = self.get_custom_reward(self.env.make_action(self.actions[action_index], 2))
+                    
+                    if params.no_reward:
+                        reward = 0
+                    else:
+                        reward = self.get_custom_reward(self.env.make_action(self.actions[action_index], 2))
 
                     d = self.env.is_episode_finished()
                     
