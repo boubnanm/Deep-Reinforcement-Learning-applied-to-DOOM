@@ -74,41 +74,41 @@ class AC_Network():
                 global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'global')
                 self.apply_grads = trainer.apply_gradients(zip(grads,global_vars))
 
-def doomHead(x):
-    ''' Learning by Prediction ICLR 2017 paper
-        (their final output was 64 changed to 256 here)
-        input: [None, 120, 160, 1]; output: [None, 1280] -> [None, 256];
-    '''
-    print('Using doom head design')
-    x = tf.nn.elu(conv2d(x, 8, "l1", [5, 5], [4, 4]))
-    x = tf.nn.elu(conv2d(x, 16, "l2", [3, 3], [2, 2]))
-    x = tf.nn.elu(conv2d(x, 32, "l3", [3, 3], [2, 2]))
-    x = tf.nn.elu(conv2d(x, 64, "l4", [3, 3], [2, 2]))
-    x = flatten(x)
-    x = tf.nn.elu(linear(x, 256, "fc", normalized_columns_initializer(0.01)))
-    return x
+# def doomHead(x):
+#     ''' Learning by Prediction ICLR 2017 paper
+#         (their final output was 64 changed to 256 here)
+#         input: [None, 120, 160, 1]; output: [None, 1280] -> [None, 256];
+#     '''
+#     print('Using doom head design')
+#     x = tf.nn.elu(conv2d(x, 8, "l1", [5, 5], [4, 4]))
+#     x = tf.nn.elu(conv2d(x, 16, "l2", [3, 3], [2, 2]))
+#     x = tf.nn.elu(conv2d(x, 32, "l3", [3, 3], [2, 2]))
+#     x = tf.nn.elu(conv2d(x, 64, "l4", [3, 3], [2, 2]))
+#     x = flatten(x)
+#     x = tf.nn.elu(linear(x, 256, "fc", normalized_columns_initializer(0.01)))
+#     return x
 
 
-def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", dtype=tf.float32, collections=None):
-    with tf.variable_scope(name):
-        stride_shape = [1, stride[0], stride[1], 1]
-        filter_shape = [filter_size[0], filter_size[1], int(x.get_shape()[3]), num_filters]
+# def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", dtype=tf.float32, collections=None):
+#     with tf.variable_scope(name):
+#         stride_shape = [1, stride[0], stride[1], 1]
+#         filter_shape = [filter_size[0], filter_size[1], int(x.get_shape()[3]), num_filters]
 
-        # there are "num input feature maps * filter height * filter width"
-        # inputs to each hidden unit
-        fan_in = np.prod(filter_shape[:3])
-        # each unit in the lower layer receives a gradient from:
-        # "num output feature maps * filter height * filter width" /
-        #   pooling size
-        fan_out = np.prod(filter_shape[:2]) * num_filters
-        # initialize weights with random weights
-        w_bound = np.sqrt(6. / (fan_in + fan_out))
+#         # there are "num input feature maps * filter height * filter width"
+#         # inputs to each hidden unit
+#         fan_in = np.prod(filter_shape[:3])
+#         # each unit in the lower layer receives a gradient from:
+#         # "num output feature maps * filter height * filter width" /
+#         #   pooling size
+#         fan_out = np.prod(filter_shape[:2]) * num_filters
+#         # initialize weights with random weights
+#         w_bound = np.sqrt(6. / (fan_in + fan_out))
 
-        w = tf.get_variable("W", filter_shape, dtype, tf.random_uniform_initializer(-w_bound, w_bound),
-                            collections=collections)
-        b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
-                            collections=collections)
-        return tf.nn.conv2d(x, w, stride_shape, pad) + b
+#         w = tf.get_variable("W", filter_shape, dtype, tf.random_uniform_initializer(-w_bound, w_bound),
+#                             collections=collections)
+#         b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
+#                             collections=collections)
+#         return tf.nn.conv2d(x, w, stride_shape, pad) + b
 
 def doomHead2(x):#,scope):
 #     with tf.variable_scope(scope):
@@ -120,10 +120,10 @@ def doomHead2(x):#,scope):
         
     return hidden
 
-def linear(x, size, name, initializer=None, bias_init=0):
-    w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
-    b = tf.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
-    return tf.matmul(x, w) + b
+# def linear(x, size, name, initializer=None, bias_init=0):
+#     w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
+#     b = tf.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
+#     return tf.matmul(x, w) + b
     
 class StateActionPredictor(object):
     def __init__(self, ob_space, ac_space, scope, trainer, as_player=False):
@@ -141,9 +141,8 @@ class StateActionPredictor(object):
     
             # feature encoding: phi1, phi2: [None, LEN]
             size = 256
-            phi1 = doomHead2(phi1)#doomHead(phi1)
-#             with tf.variable_scope(scope, reuse=True):
-            phi2 = doomHead2(phi2)#doomHead(phi2)
+            phi1 = doomHead2(phi1)
+            phi2 = doomHead2(phi2)
 
             # inverse model: g(phi1,phi2) -> a_inv: [None, ac_space]
             g = tf.concat([phi1, phi2],1)

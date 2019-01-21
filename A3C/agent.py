@@ -3,6 +3,8 @@ import tensorflow as tf
 import numpy as np
 from random import choice
 import time
+import os
+from PIL import Image
 
 from utils import *
 from configs import *
@@ -37,6 +39,8 @@ class Worker():
         game.set_doom_scenario_path("scenarios/"+params.scenario+".wad") #This corresponds to the simple task we will pose our agent
         if params.no_render:
             game.set_window_visible(False)
+        if as_player:
+            game.set_screen_format(ScreenFormat.RGB24)
 
         game.init()
         if params.actions=='all' :
@@ -356,14 +360,14 @@ class Worker():
                         s1 = s
                     
                     if params.use_curiosity:
-                        curiosity = self.local_Pred.pred_bonus(s,s1,a_dist[0])
+                        curiosity = np.clip(self.local_Pred.pred_bonus(s,s1,a_dist[0]),-1,1)/5
                         self.episode_curiosity += curiosity
                     else:
                         curiosity = 0
                     
                     r = curiosity + reward
                         
-                    episode_buffer.append([s,action_index, r,s1,d,v[0,0]])
+                    episode_buffer.append([s,action_index,r,s1,d,v[0,0]])
                     a_dists_buffer.append([a_dist[0]])
                     self.episode_values.append(v[0,0])
 
@@ -450,12 +454,16 @@ class Worker():
     def play_game(self, sess, episode_num):
         if not isinstance(sess, tf.Session):
             raise TypeError('saver should be tf.train.Saver')
-
+        
+        print("Playing",episode_num,"episodes..")
         for i in range(episode_num):
-
+            print("Launching episode",i+1)
+            time.sleep(3)
+            episode_frames = []
             self.env.new_episode()
-            state = self.env.get_state()
-            s = process_frame(state.screen_buffer, crop, resize)
+            state = self.env.get_state().screen_buffer
+            episode_frames.append(state)
+            s = process_frame(np.array(Image.fromarray(state).convert("L")), crop, resize)
             rnn_state = self.local_AC.state_init
             episode_rewards = 0
             last_total_shaping_reward = 0
@@ -463,8 +471,9 @@ class Worker():
             s_t = time.time()
 
             while not self.env.is_episode_finished():
-                state = self.env.get_state()
-                s = process_frame(state.screen_buffer, crop, resize)
+                state = self.env.get_state().screen_buffer
+                episode_frames.append(state)
+                s = process_frame(np.array(Image.fromarray(state).convert("L")), crop, resize)
                 a_dist, v, rnn_state = sess.run([self.local_AC.policy, self.local_AC.value,self.local_AC.state_out],
                                      feed_dict={self.local_AC.inputs: [s],
                                                 self.local_AC.state_in[0]:rnn_state[0],
@@ -488,5 +497,11 @@ class Worker():
 
             print('End episode: {}, Total Reward: {}, {}'.format(i, episode_rewards, last_total_shaping_reward))
             print('time costs: {}'.format(time.time() - s_t))
-            time.sleep(5)
+            
+            if (i+1)%5==0 or i==0:
+                print("Saving episode in GIF..")
+                images = np.array(episode_frames)
+                gif_file = os.path.join(params.gif_path,params.scenario+"_"+str(i+1)+".gif")
+                make_gif(images, gif_file, duration=len(images)*0.02, true_image=True, salience=False)
+                print("Done")
             

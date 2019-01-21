@@ -4,6 +4,9 @@ from agent import *
 
 def play_with_agent(params):
     
+    if not os.path.exists(params.gif_path):
+        os.makedirs(params.gif_path)
+    
     configs = tf.ConfigProto()
     configs.gpu_options.allow_growth = True
     

@@ -12,6 +12,7 @@ def parse_arguments():
     parser.add_argument("--model_path", type=str, default="./saves/model", help="Path to save models")
     parser.add_argument("--frames_path", type=str, default="./saves/frames", help="Path to save gifs")
     parser.add_argument("--summary_path", type=str, default="./saves/summary", help="Path to save training summary")
+    parser.add_argument("--gif_path", type=str, default="./saves/player_gifs", help="Path to save playing agent gifs")
     parser.add_argument("--load_model", action="store_true", help="Either to load model or not")
     # type=int, default=0, help="Either to load model or not")
     parser.add_argument("--max_episodes", type=int, default=1600, help="Maximum episodes per worker")
@@ -33,15 +34,18 @@ def parse_arguments():
     game_args.model_path += "/"+game_args.scenario
     game_args.frames_path += "/"+game_args.scenario
     game_args.summary_path += "/"+game_args.scenario
+    game_args.gif_path += "/"+game_args.scenario
     
     if game_args.use_curiosity:
         game_args.model_path += "_curiosity"
         game_args.frames_path += "_curiosity"
         game_args.summary_path += "_curiosity"
+        game_args.gif_path += "_curiosity"
         
     if game_args.no_reward:
         game_args.model_path += "_noreward"
         game_args.frames_path += "_noreward"
         game_args.summary_path += "_noreward"
+        game_args.gif_path += "_noreward"
     
     return game_args
