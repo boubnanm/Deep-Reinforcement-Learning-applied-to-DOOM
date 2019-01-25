@@ -19,9 +19,11 @@ from time import time
 def train_agents():
     tf.reset_default_graph()
     
-    shutil.rmtree(params.model_path, ignore_errors=True)
-    shutil.rmtree(params.frames_path, ignore_errors=True)
-    shutil.rmtree(params.summary_path, ignore_errors=True)
+    #Delete saves directory if not loading a model
+    if not params.load_model:
+        shutil.rmtree(params.model_path, ignore_errors=True)
+        shutil.rmtree(params.frames_path, ignore_errors=True)
+        shutil.rmtree(params.summary_path, ignore_errors=True)
 
 
     #Create a directory to save models to

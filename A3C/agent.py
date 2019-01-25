@@ -547,6 +547,7 @@ class Worker():
             print('End episode: {}, Total Reward: {}, {}'.format(i, episode_rewards, last_total_shaping_reward))
             print('Time cost: {}'.format(time.time() - s_t))
             
+            # Periodically save gif
             if (i+1)%5==0 or i==0:
                 print("Saving episode GIF..")
                 images = np.array(episode_frames)

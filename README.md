@@ -23,6 +23,7 @@ You can see our agent playing deadly corridor scenario below after training with
 ### Progress
 - [x] Add paper to the repository.
 - [x] Add A3C code.
-- [ ] Clean A3C code.
-- [ ] Add value based methods code.
-- [ ] Clean value based methods code.
+- [x] Clean A3C code.
+- [x] Add value based methods code.
+- [x] Clean value based methods code.
+- [ ] Add single main for all models.

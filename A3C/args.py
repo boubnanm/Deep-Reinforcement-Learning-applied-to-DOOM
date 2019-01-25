@@ -14,7 +14,6 @@ def parse_arguments():
     parser.add_argument("--summary_path", type=str, default="./saves/summary", help="Path to save training summary")
     parser.add_argument("--gif_path", type=str, default="./saves/player_gifs", help="Path to save playing agent gifs")
     parser.add_argument("--load_model", action="store_true", help="Either to load model or not")
-    # type=int, default=0, help="Either to load model or not")
     parser.add_argument("--max_episodes", type=int, default=1600, help="Maximum episodes per worker")
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
     parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
