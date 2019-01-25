@@ -13,7 +13,7 @@ def play_with_agent(params):
     tf.reset_default_graph()
 
     with tf.Session(config = configs) as sess:
-        Agent = Worker(DoomGame(), 0, s_size, action_size, as_player=True)
+        Agent = Worker(DoomGame(), 0, s_size, action_size, player_mode=True)
 
         print('Loading Model...')
         saver = tf.train.Saver()
