@@ -20,7 +20,7 @@ def conv2d_size_out(size, kernel_size = 5, stride = 2):
 
 class DQNetwork(nn.Module):
     
-    def __init__(self, w = 120, h = 160, init_zeros = False, out = 3):
+    def __init__(self, w = 120, h = 160, init_zeros = False, stack_size = 4,out = 3):
         """
         Description
         ---------------
@@ -31,13 +31,14 @@ class DQNetwork(nn.Module):
         w          : Int, input width (default=120)
         h          : Int, input height (default=160)
         init_zeros : Boolean, whether to initialize the weights to zero or not.
+        stack_size : Int, input dimension which is the number of frames to stack to create motion (default=4)
         out        : Int, the number of output units, it corresponds to the number of possible actions (default=3).
                      Be careful, it must be changed when considering a different number of possible actions.
         """
         
         super(DQNetwork, self).__init__()
         
-        self.conv_1 = nn.Conv2d(in_channels = 4, out_channels = 16, kernel_size = 5, stride = 2)
+        self.conv_1 = nn.Conv2d(in_channels = stack_size, out_channels = 16, kernel_size = 5, stride = 2)
         self.conv_2 = nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 5, stride = 2)
         self.conv_3 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size = 5, stride = 2)
         if init_zeros:
@@ -61,7 +62,7 @@ class DQNetwork(nn.Module):
     
 class DDDQNetwork(nn.Module):
     
-    def __init__(self, w = 120, h = 160, init_zeros = False, out = 3):
+    def __init__(self, w = 120, h = 160, init_zeros = False, stack_size = 4, out = 3):
         """
         Description
         ---------------
@@ -72,6 +73,7 @@ class DDDQNetwork(nn.Module):
         w          : Int, input width (default=120)
         h          : Int, input height (default=160)
         init_zeros : Boolean, whether to initialize the weights to zero or not.
+        stack_size : Int, input dimension which is the number of frames to stack to create motion (default=4)
         out        : Int, the number of output units, it corresponds to the number of possible actions (default=3).
                      Be careful, it must be changed when considering a different number of possible actions.
         """
@@ -79,7 +81,7 @@ class DDDQNetwork(nn.Module):
         super(DDDQNetwork, self).__init__()
         
         # Conv Module
-        self.conv_1 = nn.Conv2d(in_channels = 4, out_channels = 16, kernel_size = 5, stride = 2)
+        self.conv_1 = nn.Conv2d(in_channels = stack_size, out_channels = 16, kernel_size = 5, stride = 2)
         self.conv_2 = nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size = 5, stride = 2)
         self.conv_3 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size = 5, stride = 2)
         

@@ -6,13 +6,18 @@ import torchvision.transforms as T
 
 import numpy as np
 import random
+import time
 from vizdoom import *
+from models import *
 
 from collections import deque
 import matplotlib.pyplot as plt
 
 import warnings
-warnings.filterwarnings('ignore') 
+warnings.filterwarnings('ignore')
+
+# Boolean specifying whether GPUs are available or not.
+use_cuda = torch.cuda.is_available()
 
 """
 Environment tools
@@ -27,7 +32,7 @@ def create_environment(scenario = 'basic', window = False):
     Parameters
     ---------------
     scenario : String, either 'basic' or 'deadly_corridor', the Doom scenario to use (default='basic')
-    window   : Boolea, whether to render the window of the game or not (default=False)
+    window   : Boolean, whether to render the window of the game or not (default=False)
     
     Returns
     ---------------
@@ -62,31 +67,84 @@ def create_environment(scenario = 'basic', window = False):
     return game, possible_actions
        
 
-def test_environment():
+def test_environment(weights, scenario = 'basic', window = False, total_episodes = 100, enhance = 'none', frame_skip = 2):
+    """
+    Description
+    ---------------
+    Test a trained agent in a scenario (Be careful, the chosen weights must match the training scenario)
+    
+    Parameters
+    ---------------
+    weights        : String, path to .pth file containing the weights of the network we want to test.
+    scenario       : String, either 'basic' or 'deadly_corridor', the Doom scenario to use (default='basic')
+    window         : Boolean, whether to render the window of the game or not (default=False)
+    total_episodes : Int, the number of testing episodes (default=100)
+    enhance        : String, 'none' or 'dueling' (default='none')
+    frame_skip     : Int, the number of frames to repeat the action on (default=2)
+    
+    Returns
+    ---------------
+    game             : VizDoom game instance.
+    possible_actions : List, the one-hot encoded possible actions.
+    """
+    
     game = DoomGame()
-    game.load_config("basic.cfg")
-    game.set_doom_scenario_path("basic.wad")
-    game.set_screen_resolution(ScreenResolution.RES_320X240)
-    game.init()
-    shoot = [0, 0, 1]
-    left = [1, 0, 0]
-    right = [0, 1, 0]
-    actions = [shoot, left, right]
+    if window:
+        game.set_window_visible(True)
+        
+    else:
+        game.set_window_visible(False)
+    
+    # Load the correct configuration
+    if scenario == 'basic':
+        game.load_config("scenarios/basic.cfg")
+        game.set_doom_scenario_path("scenarios/basic.wad")
+        game.init()
+        left = [1, 0, 0]
+        right = [0, 1, 0]
+        shoot = [0, 0, 1]
+        possible_actions = [left, right, shoot]
+        
+    elif scenario == 'deadly_corridor':
+        game.load_config("deadly_corridor.cfg")
+        game.set_doom_scenario_path("deadly_corridor.wad")
+        game.init()
+        possible_actions = np.identity(6,dtype=int).tolist()
+        possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]])
 
-    episodes = 10
-    for i in range(episodes):
+    if enhance == 'none':
+        model = DQNetwork(out = len(possible_actions))
+        if use_cuda:
+            model.cuda()
+
+    elif enhance == 'dueling':
+        model = DDDQNetwork(out = len(possible_actions))
+        if use_cuda:
+            model.cuda()
+
+    # Load the weights of the model
+    state_dict = torch.load(weights)
+    model.load_state_dict(state_dict)
+    for i in range(total_episodes):
         game.new_episode()
-        while not game.is_episode_finished():
-            state = game.get_state()
-            img = state.screen_buffer
-            misc = state.game_variables
-            action = random.choice(actions)
-            print(action)
+        done = game.is_episode_finished()
+        state = get_state(game)
+        in_channels = model._modules['conv_1'].in_channels
+        stacked_frames = deque([torch.zeros((120, 160), dtype=torch.int) for i in range(in_channels)], maxlen = in_channels)
+        state, stacked_frames = stack_frames(stacked_frames, state, True, in_channels)
+        while not done:
+            if use_cuda:
+                q = model(state.cuda())
+
+            else:
+                q = model(state)
+
+            action = possible_actions[int(torch.max(q, 1)[1][0])]
             reward = game.make_action(action, frame_skip)
-            print ("\treward:", reward)
+            done = game.is_episode_finished()
             time.sleep(0.02)
             
-        print ("Result:", game.get_total_reward())
+        print ("Total reward:", game.get_total_reward())
         time.sleep(2)
         
     game.close()
@@ -186,9 +244,7 @@ def transforms(resize = (120, 160)):
                 T.Resize(resize),
                 T.ToTensor()])
     
-preprocess_frame = transforms()
-
-def stack_frames(stacked_frames, state, is_new_episode, maxlen = 4):
+def stack_frames(stacked_frames, state, is_new_episode, maxlen = 4, resize = (120, 160)):
     """
     Description
     --------------
@@ -200,6 +256,7 @@ def stack_frames(stacked_frames, state, is_new_episode, maxlen = 4):
     state          : the return of get_state() function.
     is_new_episode : boolean, if it's a new episode, we stack the same initial state maxlen times.
     maxlen         : Int, maximum length of stacked_frames (default=4)
+    resize         : tuple, shape of the resized frame (default=(120,160))
     
     Returns
     --------------
@@ -208,7 +265,7 @@ def stack_frames(stacked_frames, state, is_new_episode, maxlen = 4):
     """
     
     # Preprocess frame
-    frame = preprocess_frame(state)
+    frame = transforms(resize)(state)
     if is_new_episode:
         # Clear our stacked_frames
         stacked_frames = deque([frame[None] for i in range(maxlen)], maxlen=maxlen) # We add a dimension for the batch
@@ -254,7 +311,12 @@ def predict_action(explore_start, explore_stop, decay_rate, decay_step, state, m
         action = random.choice(possible_actions)
         
     else:
-        Qs = model.forward(state.cuda())
+        if use_cuda:
+            Qs = model.forward(state.cuda())
+            
+        else:
+            Qs = model.forward(state)
+            
         action = possible_actions[int(torch.max(Qs, 1)[1][0])]
 
     return action, explore_probability

@@ -7,7 +7,7 @@ Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state'
 
 class Agent:
     
-    def __init__(self, possible_actions, scenario, memory = 'uniform', max_size = 1000, stack_size = 4, batch_size = 64):
+    def __init__(self, possible_actions, scenario, memory = 'uniform', max_size = 1000, stack_size = 4, batch_size = 64, resize = (120, 160)):
         """
         Description
         --------------
@@ -21,6 +21,7 @@ class Agent:
         max_size         : Int, maximum size of the replay buffer (default=1000)
         stack_size       : Int, the number of frames to stack to create motion (default=4)
         batch_size       : Int, the batch size used for backpropagation (default=64)
+        resize           : tuple, shape of the resized frame (default=(120,160))
         """
         
         if memory == 'uniform':
@@ -34,6 +35,7 @@ class Agent:
         self.possible_actions = possible_actions
         self.scenario = scenario
         self.batch_size = batch_size
+        self.resize = resize
             
     def train(self, game, total_episodes = 100, pretrain = 100, frame_skip = 4, enhance = 'none', lr = 1e-4, max_tau = 100, 
                      explore_start = 1.0, explore_stop = 0.01, decay_rate = 0.0001, gamma = 0.99, freq = 50, init_zeros = False):
@@ -62,8 +64,8 @@ class Agent:
         # Pretraining phase
         game.new_episode()
         state = get_state(game)
-        stacked_frames = deque([torch.zeros((120, 160), dtype=torch.int) for i in range(self.stack_size)], maxlen = self.stack_size)
-        state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size)
+        stacked_frames = deque([torch.zeros(self.resize, dtype=torch.int) for i in range(self.stack_size)], maxlen = self.stack_size)
+        state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size, self.resize)
         for i in range(pretrain):
             action = random.choice(self.possible_actions)
             reward = game.make_action(action, frame_skip)
@@ -73,18 +75,18 @@ class Agent:
             if done:
                 # Set next state to zeros
                 next_state = np.zeros((240, 320), dtype='uint8')[:, :, None] # (240, 320) is the screen resolution, see cfg files /scenarios
-                next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size)
+                next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size, self.resize)
                 # Add experience to replay buffer
                 self.memory.add((state, action, reward, next_state, torch.tensor([not done], dtype = torch.float)))
                 # Start a new episode
                 game.new_episode()
                 state = get_state(game)
-                state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size)
+                state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size, self.resize)
 
             else:
                 # Get next state
                 next_state = get_state(game)
-                next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size)
+                next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size, self.resize)
                 # Add experience to memory
                 self.memory.add((state, action, reward, next_state, torch.tensor([not done], dtype = torch.float)))
                 # update state variable
@@ -95,7 +97,7 @@ class Agent:
         if enhance == 'none':
             dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
             target_dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
-            if torch.cuda.is_available():
+            if use_cuda:
                 print("End of trainig phase: The screen might be frozen now, don't worry, models take some time to be loaded on GPU")
                 dqn_model.cuda()
                 target_dqn_model.cuda()
@@ -103,7 +105,7 @@ class Agent:
         elif enhance == 'dueling':
             dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
             target_dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
-            if torch.cuda.is_available():
+            if use_cuda:
                 print("End of trainig phase: The screen might be frozen now, don't worry, models take some time to be loaded on GPU")
                 dqn_model.cuda()
                 target_dqn_model.cuda()
@@ -116,8 +118,8 @@ class Agent:
             game.new_episode()
             done = game.is_episode_finished()
             state = get_state(game)
-            stacked_frames = deque([torch.zeros((120, 160), dtype=torch.int) for i in range(4)], maxlen = 4)
-            state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size)
+            stacked_frames = deque([torch.zeros(self.resize, dtype=torch.int) for i in range(self.stack_size)], maxlen = self.stack_size)
+            state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size, self.resize)
             while (not done):
                 tau += 1
                 decay_step += 1
@@ -133,7 +135,7 @@ class Agent:
                 action = torch.tensor([action], dtype = torch.float)
                 if done:
                     next_state = np.zeros((240, 320), dtype='uint8')[:, :, None]
-                    next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size)
+                    next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size, self.resize)
                     total_reward = np.sum(episode_rewards)
                     print('Episode: {}'.format(episode),
                               'Total reward: {}'.format(total_reward),
@@ -145,7 +147,7 @@ class Agent:
                 else:
                     # Get the next state
                     next_state = get_state(game)
-                    next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size)
+                    next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size, self.resize)
                     # Add experience to memory
                     self.memory.add((state, action, reward, next_state, torch.tensor([not done], dtype = torch.float)))
                     # Update state variable
