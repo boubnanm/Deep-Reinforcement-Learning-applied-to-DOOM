@@ -9,11 +9,11 @@ from PIL import Image
 from utils import *
 from configs import *
 
-from actor_critic_network import *
+from networks import *
 
 class Worker():
     
-    def __init__(self, game, name, s_size, action_size, trainer=None, model_path=None, global_episodes=None, player_mode=False):
+    def __init__(self, name, s_size, a_size, trainer=None, model_path=None, player_mode=False):
         """
         Description
         --------------
@@ -23,12 +23,12 @@ class Worker():
         --------------
         game            : Env, environment used for the training.
         name            : str, name of the worker.
-        s_size          : Int, dimension of the state space (width*height*channels).
-        action_size     : Int, dimension of the action space.
+        s_size          : Int, dimension of state space (width*height*channels).
+        a_size          : Int, dimension of action space.
         trainer         : tf.train, Tensorflow optimizer used for the module.
         model_path      : str, path for the model to load if any.
         global_episodes : tf.Variable, episode counter for all workers.
-        player_mode     : Bool, module used for training or playing.
+        player_mode     : Bool, worker used in playing mode.
         """
         
         self.name = "worker_" + str(name)
@@ -37,25 +37,21 @@ class Worker():
         if not player_mode:
             self.model_path = model_path
             self.trainer = trainer
-            #self.global_episodes = global_episodes
-            #self.increment = self.global_episodes.assign_add(1)
-
             self.initialize_containers()
-        
             self.summary_writer = tf.summary.FileWriter(params.summary_path+"/train_"+str(self.number))
-
-        #Create the local copy of the network and the tensorflow op to copy global parameters to local network
-        self.local_AC = AC_Network(s_size,action_size,self.name,trainer,player_mode) 
-        self.update_local_ops = update_target_graph('global',self.name)
-        
-        if params.use_curiosity:
-            self.local_Pred = StateActionPredictor(s_size,action_size,self.name+"_P",trainer,player_mode)
-            self.update_local_ops_P = update_target_graph('global_P',self.name+"_P")  
         
         #The Below code is related to setting up the Doom environment  
         self.env, self.actions = create_environment(scenario=params.scenario, no_window=params.no_render, 
                                                     actions_type=params.actions, player_mode=player_mode)
-    
+
+        #Create the local copy of the network and the tensorflow op to copy global parameters to local network
+        self.local_AC = AC_Network(s_size, a_size, self.name, trainer, player_mode) 
+        self.update_local_ops = update_target_graph('global', self.name)
+        
+        if params.use_curiosity:
+            self.local_Pred = StateActionPredictor(s_size, a_size, self.name+"_P", trainer, player_mode)
+            self.update_local_ops_P = update_target_graph('global_P',self.name+"_P")  
+
     
     def initialiaze_game_vars(self):
         """
@@ -509,11 +505,8 @@ class Worker():
             # Initialize frames buffer to save gifs
             episode_frames = []
             
-            # Begin episode and get state
+            # Begin episode
             self.env.new_episode()
-            state = self.env.get_state().screen_buffer
-            episode_frames.append(state)
-            s = process_frame(np.array(Image.fromarray(state).convert("L")), crop, resize)
             
             # Initialize variables and LSTM gates
             rnn_state = self.local_AC.state_init
@@ -523,15 +516,17 @@ class Worker():
             s_t = time.time()
 
             while not self.env.is_episode_finished():
+                # Get state
                 state = self.env.get_state().screen_buffer
                 episode_frames.append(state)
                 s = process_frame(np.array(Image.fromarray(state).convert("L")), crop, resize)
                 
                 # Get action from policy module
                 a_dist, v, rnn_state = sess.run([self.local_AC.policy, self.local_AC.value,self.local_AC.state_out],
-                                     feed_dict={self.local_AC.inputs: [s],
-                                                self.local_AC.state_in[0]:rnn_state[0],
-                                                self.local_AC.state_in[1]:rnn_state[1]})
+                                                feed_dict={self.local_AC.inputs: [s],
+                                                           self.local_AC.state_in[0]:rnn_state[0],
+                                                           self.local_AC.state_in[1]:rnn_state[1]})
+                
                 a_index = self.choose_action_index(a_dist, deterministic=True)
                 
                 # Make action and get reward

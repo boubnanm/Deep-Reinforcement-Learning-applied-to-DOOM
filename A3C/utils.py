@@ -7,6 +7,7 @@ import scipy.misc
 import csv
 import tensorflow.contrib.slim as slim
 import os
+import moviepy.editor as mpy
 
 from vizdoom import *
 from configs import *
@@ -125,7 +126,6 @@ def normalized_columns_initializer(std=1.0):
     
 #This code allows gifs to be saved of the training episode for use in the Control Center.
 def make_gif(images, fname, fps=30):
-    import moviepy.editor as mpy
     
     def make_frame(t):
         try:

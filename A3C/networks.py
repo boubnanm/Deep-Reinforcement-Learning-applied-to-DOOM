@@ -1,16 +1,13 @@
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import numpy as np
-from constants import constants
 
 from configs import *
 from utils import *
 
-resize0, resize1 = resize
-
 class AC_Network():
     
-    def __init__(self, s_size, a_size, scope, trainer, as_player=False):
+    def __init__(self, s_size, a_size, scope, trainer=None, as_player=False):
         """
         Description
         --------------
@@ -18,9 +15,9 @@ class AC_Network():
 
         Parameters
         --------------
-        s_size      : Int, dimension of the state space (width*height*channels).
-        a_size      : Int, dimension of the action space.
-        scope       : Int, the stride used in the conv layer (default=2)
+        s_size      : Int, dimension of state space (width*height*channels).
+        a_size      : Int, dimension of action space.
+        scope       : str, name of the scope used by tensorflow.
         trainer     : tf.train, Tensorflow optimizer used for the module.
         as_player   : Bool, module used for training or playing.
         """
@@ -28,7 +25,7 @@ class AC_Network():
         with tf.variable_scope(scope):
             #Input and visual encoding layers
             self.inputs = tf.placeholder(shape=[None,s_size],dtype=tf.float32)
-            self.imageIn = tf.reshape(self.inputs,shape=[-1,resize0,resize1,1])
+            self.imageIn = tf.reshape(self.inputs,shape=[-1,resize[0],resize[1],1])
             self.conv1 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.imageIn, num_outputs=16, kernel_size=[8,8], stride=[4,4], padding='VALID')
             self.conv2 = slim.conv2d(activation_fn=tf.nn.elu, inputs=self.conv1, num_outputs=32, kernel_size=[4,4], stride=[2,2], padding='VALID')
             hidden = slim.fully_connected(slim.flatten(self.conv2),256,activation_fn=tf.nn.elu)
@@ -66,7 +63,7 @@ class AC_Network():
                                               weights_initializer=normalized_columns_initializer(1.0),
                                               biases_initializer=None)
             
-            #Only the worker network need ops for loss functions and gradient updating.
+            # Only workers networks needs loss functions and gradient updating when training.
             if (scope != 'global') and (not as_player):
                 
                 #Variables for loss functions
@@ -94,7 +91,7 @@ class AC_Network():
     
 class StateActionPredictor(object):
     
-    def __init__(self, ob_space, ac_space, scope, trainer, as_player=False):
+    def __init__(self, s_size, a_size, scope, trainer=None, as_player=False):
         """
         Description
         --------------
@@ -102,19 +99,19 @@ class StateActionPredictor(object):
 
         Parameters
         --------------
-        ob_space    : Int, dimension of the state space (width*height*channels).
-        ac_space    : Int, dimension of the action space.
-        scope       : Int, the stride used in the conv layer (default=2)
+        s_size      : int, dimension of the state space (width*height*channels).
+        a_size      : int, dimension of the action space.
+        scope       : str, name of the scope used by tensorflow.
         trainer     : tf.train, Tensorflow optimizer used for the module.
-        as_player   : Bool, module used for training or playing.
+        as_player   : bool, module used for training or playing.
         """
         
         with tf.variable_scope(scope):
-            input_shape = [None,ob_space]
+            input_shape = [None,s_size]
             self.s1 = phi1 = tf.placeholder(tf.float32, input_shape)
             self.s2 = phi2 = tf.placeholder(tf.float32, input_shape)
             self.aindex = aindex = tf.placeholder(shape=[None],dtype=tf.int32)
-            self.asample = asample = tf.one_hot(self.aindex,ac_space,dtype=tf.float32)
+            self.asample = asample = tf.one_hot(self.aindex,a_size,dtype=tf.float32)
 
             # Feature encoding: Encode states
             size = 256
@@ -124,7 +121,7 @@ class StateActionPredictor(object):
             # Inverse model: Predict action from current and next states
             phi = tf.concat([phi1, phi2],1)
             phi = tf.nn.relu(linear(phi, size, "inv1", normalized_columns_initializer(0.01)))
-            logits = linear(phi, ac_space, "invlast", normalized_columns_initializer(0.01))
+            logits = linear(phi, a_size, "invlast", normalized_columns_initializer(0.01))
             self.ainvprobs = tf.nn.softmax(logits, dim=-1)  
             self.invloss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=aindex), name="invloss")
             
@@ -135,11 +132,9 @@ class StateActionPredictor(object):
             f = linear(f, phi1.get_shape()[1].value, "flast", normalized_columns_initializer(0.01))
             self.forwardloss = 0.5 * tf.reduce_mean(tf.square(tf.subtract(f, phi2)), name='forwardloss') * phi1.get_shape()[1].value
 
-            beta = constants['FORWARD_LOSS_WT']
-            lr_pred = constants['PREDICTION_LR_SCALE']
             self.loss = lr_pred*(beta*self.forwardloss + (1-beta)*self.invloss)
             
-            # Only the worker network need ops for loss functions and gradient updating.
+            # Only workers networks needs loss functions and gradient updating when training.
             if (scope != 'global_P') and (not as_player):
                 
                 #Get gradients from local network using local losses
@@ -162,7 +157,7 @@ class StateActionPredictor(object):
         --------------
         x    : Tensor, state.
         """
-        imageIn = tf.reshape(x,shape=[-1,resize0,resize1,1])
+        imageIn = tf.reshape(x,shape=[-1,resize[0],resize[1],1])
         conv1 = slim.conv2d(activation_fn=tf.nn.elu, inputs=imageIn,num_outputs=16, kernel_size=[8,8], stride=[4,4], padding='VALID')
         conv2 = slim.conv2d(activation_fn=tf.nn.elu, inputs=conv1,num_outputs=32, kernel_size=[4,4],stride=[2,2], padding='VALID')
         encoding = slim.fully_connected(slim.flatten(conv2),256,activation_fn=tf.nn.elu)
@@ -196,10 +191,13 @@ class StateActionPredictor(object):
         asample : Tensor, one hot encoding for the sampled action.
         """
         sess = tf.get_default_session()
-        error = sess.run(self.forwardloss, {self.s1: [s1], self.s2: [s2], self.asample: [asample]}) * constants['PREDICTION_BETA']
+        error = sess.run(self.forwardloss, {self.s1: [s1], self.s2: [s2], self.asample: [asample]}) * pred_bonus_coef
         return error
-    
-    
+
+def linear(x, size, name, initializer=None, bias_init=0):
+    w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
+    b = tf.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
+    return tf.matmul(x, w) + b    
     
 # def doomHead(x):
 #     ''' Learning by Prediction ICLR 2017 paper
@@ -238,7 +236,3 @@ class StateActionPredictor(object):
 #         return tf.nn.conv2d(x, w, stride_shape, pad) + b
 
 
-# def linear(x, size, name, initializer=None, bias_init=0):
-#     w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
-#     b = tf.get_variable(name + "/b", [size], initializer=tf.constant_initializer(bias_init))
-#     return tf.matmul(x, w) + b

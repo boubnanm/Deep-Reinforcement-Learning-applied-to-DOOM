@@ -2,14 +2,14 @@ import os
 import shutil
 
 from agent import *
-from actor_critic_network import *
+from networks import *
 
 import threading
 import multiprocessing
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import tensorflow as tf
-from vizdoom import *
+#from vizdoom import *
 
 #from random import choice
 from time import sleep
@@ -35,24 +35,29 @@ def train_agents():
         os.makedirs(params.frames_path)
 
     with tf.device("/cpu:0"): 
-        global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
         
-        master_network = AC_Network(s_size,action_size,'global',None) # Generate global AC network
+        # Generate global networks : Actor-Critic and ICM
+        master_network = AC_Network(state_size, action_size, 'global') # Generate global AC network
         if params.use_curiosity:
-            master_network_P = StateActionPredictor(s_size,action_size,'global_P',None) # Generate global AC network
-        if params.num_workers==-1:
-            num_workers = multiprocessing.cpu_count() # Set workers to number of available CPU threads
+            master_network_P = StateActionPredictor(state_size, action_size, 'global_P') # Generate global AC network
+        
+        # Set number of workers
+        if params.num_workers == -1:
+            num_workers = multiprocessing.cpu_count()
         else:
             num_workers = params.num_workers
-        workers = []
+        
         # Create worker classes
+        workers = []
         for i in range(num_workers):
             trainer = tf.train.AdamOptimizer(learning_rate=params.lr)
-            workers.append(Worker(DoomGame(), i, s_size, action_size, trainer, params.model_path, global_episodes))
+            workers.append(Worker(i, state_size, action_size, trainer, params.model_path))
         saver = tf.train.Saver(max_to_keep=5)
 
+        
     with tf.Session() as sess:
-        coord = tf.train.Coordinator()
+        
+        # Loading pretrained model
         if params.load_model == True:
             print ('Loading Model...')
             ckpt = tf.train.get_checkpoint_state(model_path)
@@ -60,8 +65,8 @@ def train_agents():
         else:
             sess.run(tf.global_variables_initializer())
 
-        # This is where the asynchronous magic happens.
-        # Start the "work" process for each worker in a separate threat.
+        # Starting initialized workers, each in a separate thread.
+        coord = tf.train.Coordinator()
         worker_threads = []
         for worker in workers:
             worker_work = lambda: worker.work(params.max_episodes,params.gamma,sess,coord,saver)
