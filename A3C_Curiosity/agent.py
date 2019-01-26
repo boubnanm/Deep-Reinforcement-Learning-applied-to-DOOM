@@ -187,8 +187,8 @@ class Worker():
             print('{}, kills:{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
                             self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_curiosity, 
                             self.episode_reward/self.episode_step_count, self.episode_curiosity/self.episode_step_count, 
-                            self.episode_step_count, , time.time()-self.episode_st))
-                          
+                            self.episode_step_count, time.time()-self.episode_st))
+                    
         if params.scenario=='my_way_home':
             print('{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
                             self.name, self.episode_count, self.episode_reward, self.episode_curiosity, self.episode_reward/self.episode_step_count, 
@@ -547,6 +547,6 @@ class Worker():
                 print("Saving episode GIF..")
                 images = np.array(episode_frames)
                 gif_file = os.path.join(params.gif_path,params.scenario+"_"+str(i+1)+".gif")
-                make_gif(images, gif_file)
+                make_gif(images, gif_file, fps=100)
                 print("Done")
             
