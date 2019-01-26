@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from vizdoom import *
 
-from random import choice
+#from random import choice
 from time import sleep
 from time import time
 
@@ -40,10 +40,10 @@ def train_agents():
         master_network = AC_Network(s_size,action_size,'global',None) # Generate global AC network
         if params.use_curiosity:
             master_network_P = StateActionPredictor(s_size,action_size,'global_P',None) # Generate global AC network
-        if params.num_processes==-1:
+        if params.num_workers==-1:
             num_workers = multiprocessing.cpu_count() # Set workers to number of available CPU threads
         else:
-            num_workers = params.num_processes
+            num_workers = params.num_workers
         workers = []
         # Create worker classes
         for i in range(num_workers):

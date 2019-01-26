@@ -357,7 +357,7 @@ class Worker():
         """
     
         print ("Starting worker " + str(self.number))
-        self.episode_count = 0 #sess.run(self.global_episodes)
+        self.episode_count = 0
         total_steps = 0
         
         with sess.as_default(), sess.graph.as_default():                 
@@ -479,8 +479,8 @@ class Worker():
                 if self.name == 'worker_0' and self.episode_count % params.freq_gif_save == 0 and self.episode_count != 0:
                     time_per_step = 0.05
                     images = np.array(episode_frames)
-                    make_gif(images, params.frames_path+'/image'+str(self.episode_count)+'.gif',
-                             duration=len(images)*time_per_step,true_image=True,salience=False)
+                    gif_path = os.path.join(params.frames_path,'image'+str(self.episode_count)+'.gif')
+                    make_gif(images, gif_path)
                 
                 # Periodically save model parameters
                 if self.episode_count % params.freq_model_save == 0 and self.name == 'worker_0' and self.episode_count != 0:
@@ -515,7 +515,7 @@ class Worker():
             episode_frames.append(state)
             s = process_frame(np.array(Image.fromarray(state).convert("L")), crop, resize)
             
-            # Initialize LSTM gates and variables
+            # Initialize variables and LSTM gates
             rnn_state = self.local_AC.state_init
             episode_rewards = 0
             last_total_shaping_reward = 0
@@ -552,6 +552,6 @@ class Worker():
                 print("Saving episode GIF..")
                 images = np.array(episode_frames)
                 gif_file = os.path.join(params.gif_path,params.scenario+"_"+str(i+1)+".gif")
-                make_gif(images, gif_file, duration=len(images)*0.02, true_image=True, salience=False)
+                make_gif(images, gif_file)
                 print("Done")
             
