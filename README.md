@@ -16,6 +16,7 @@ The following gif shows our agent playing deadly corridor scenario after trainin
 
 <p align="center">
 <img align="center" src="A3C_Curiosity/gifs/deadly_corridor_5.gif"/>
+<img align="center" src="A3C_Curiosity/gifs/defend_the_center_1.gif"/>
 </p>
 
 
