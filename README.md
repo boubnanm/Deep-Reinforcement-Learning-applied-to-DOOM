@@ -10,9 +10,9 @@ This is the final project for the Reinforcement Learning Course of the 2018/2019
 
 This project, done by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaouki](https://github.com/chaoukia), consists on applying deep reinforcement learning algorithms to learn an agent play different scenarios of the game DOOM.
 
-We applied value based methods such as DQN, DRQN, DDQN, and DDDQN with prioritized experience replay, and hybrid algorithms such as A3C and Curiosity. You can see our paper detailing our work in this repository.
+We applied value based methods such as DQN, DRQN, DDQN, and DDDQN with prioritized experience replay, and hybrid algorithms such as A3C and Curiosity. You can find our paper detailing our work in this repository.
 
-You can see our agent playing deadly corridor scenario below after training with an A3C algorithm : 
+The following gif shows our agent playing deadly corridor scenario after training with an A3C algorithm : 
 
 <p align="center">
 <img align="center" src="A3C_Curiosity/gifs/deadly_corridor_5.gif"/>
@@ -26,4 +26,5 @@ You can see our agent playing deadly corridor scenario below after training with
 - [x] Clean A3C code.
 - [x] Add value based methods code.
 - [x] Clean value based methods code.
-- [ ] Add single main for all models.
+- [ ] Add packages requirements.
+- [ ] Add instructions to run code.
