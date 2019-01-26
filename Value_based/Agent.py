@@ -54,13 +54,21 @@ class Agent:
         """
         
         r = 0
-#         if self.scenario == 'defend_the_center':
-        r += variables_cur['kills'] - variables_prev['kills']
-        if variables_cur['ammo'] < variables_prev['ammo']:
-            r -= 0.1
+        if self.scenario == 'defend_the_center':
+            r += variables_cur['kills'] - variables_prev['kills']
+            if variables_cur['ammo'] < variables_prev['ammo']:
+                r -= 0.1
 
-        if variables_cur['health'] < variables_prev['health']:
-            r -= 0.1
+            if variables_cur['health'] < variables_prev['health']:
+                r -= 0.1
+                
+        elif self.scenario == 'deadly_corridor':
+            r += (variables_cur['kills'] - variables_prev['kills'])*5
+            if variables_cur['ammo'] < variables_prev['ammo']:
+                r -= 0.1
+
+            if variables_cur['health'] < variables_prev['health']:
+                r -= 1
                 
         return r
         
@@ -93,7 +101,7 @@ class Agent:
         game.new_episode()
         # Initialize current and previous game variables dictionnaries
         variables_cur = {'kills' : game.get_game_variable(KILLCOUNT), 'health' : game.get_game_variable(HEALTH), 
-                        'ammo' : game.get_game_variable(AMMO0)}
+                        'ammo' : game.get_game_variable(AMMO2)}
         variables_prev = variables_cur.copy()
         # Get 1st state
         state = get_state(game)
@@ -106,11 +114,11 @@ class Agent:
             # Update the game vaiables dictionnaries and get the reshaped reward
             variables_cur['kills'] = game.get_game_variable(KILLCOUNT)
             variables_cur['health'] = game.get_game_variable(HEALTH)
-            variables_cur['ammo'] = game.get_game_variable(AMMO0)
+            variables_cur['ammo'] = game.get_game_variable(AMMO2)
             reward += self.get_reward(variables_cur, variables_prev)
             variables_prev = variables_cur.copy()
             # Put reward and action in tensor form
-            reward = torch.tensor([reward], dtype = torch.float)
+            reward = torch.tensor([reward/10], dtype = torch.float)
             action = torch.tensor([action], dtype = torch.float)
             done = game.is_episode_finished()
             if done:
@@ -157,6 +165,10 @@ class Agent:
             tau = 0
             episode_rewards = []
             game.new_episode()
+            variables_cur = {'kills' : game.get_game_variable(KILLCOUNT), 'health' : game.get_game_variable(HEALTH), 
+                            'ammo' : game.get_game_variable(AMMO2)}
+            variables_prev = variables_cur.copy()
+            # Get 1st state
             done = game.is_episode_finished()
             state = get_state(game)
             stacked_frames = deque([torch.zeros(self.resize, dtype=torch.int) for i in range(self.stack_size)], maxlen = self.stack_size)
@@ -168,18 +180,24 @@ class Agent:
                 action, explore_probability = predict_action(explore_start, explore_stop, decay_rate, decay_step, state, dqn_model, self.possible_actions)
                 # Perform the chosen action on frame_skip frames
                 reward = game.make_action(action, frame_skip)
+                # Update the game vaiables dictionnaries and get the reshaped reward
+                variables_cur['kills'] = game.get_game_variable(KILLCOUNT)
+                variables_cur['health'] = game.get_game_variable(HEALTH)
+                variables_cur['ammo'] = game.get_game_variable(AMMO2)
+                reward += self.get_reward(variables_cur, variables_prev)
+                variables_prev = variables_cur.copy()
                 # Check if the episode is done
                 done = game.is_episode_finished()
                 # Add the reward to total reward
-                episode_rewards.append(reward)
-                reward = torch.tensor([reward], dtype = torch.float)
+                episode_rewards.append(reward/10)
+                reward = torch.tensor([reward/10], dtype = torch.float)
                 action = torch.tensor([action], dtype = torch.float)
                 if done:
                     next_state = np.zeros((240, 320), dtype='uint8')[:, :, None]
                     next_state, stacked_frames = stack_frames(stacked_frames, next_state, False, self.stack_size, self.resize)
                     total_reward = np.sum(episode_rewards)
                     print('Episode: {}'.format(episode),
-                              'Total reward: {}'.format(total_reward),
+                              'Total reward: {:.2f}'.format(total_reward),
                               'Training loss: {:.4f}'.format(loss),
                               'Explore P: {:.4f}'.format(explore_probability))
                     # Add experience to the replay buffer

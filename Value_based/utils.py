@@ -58,8 +58,8 @@ def create_environment(scenario = 'basic', window = False):
         possible_actions = [left, right, shoot]
         
     elif scenario == 'deadly_corridor':
-        game.load_config("deadly_corridor.cfg")
-        game.set_doom_scenario_path("deadly_corridor.wad")
+        game.load_config("scenarios/deadly_corridor.cfg")
+        game.set_doom_scenario_path("scenarios/deadly_corridor.wad")
         game.init()
         possible_actions = np.identity(6,dtype=int).tolist()
 #         possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]]) # Composed actions need some work
@@ -116,11 +116,20 @@ def test_environment(weights, scenario = 'basic', window = False, total_episodes
         possible_actions = [left, right, shoot]
         
     elif scenario == 'deadly_corridor':
-        game.load_config("deadly_corridor.cfg")
-        game.set_doom_scenario_path("deadly_corridor.wad")
+        game.load_config("scenarios/deadly_corridor.cfg")
+        game.set_doom_scenario_path("scenarios/deadly_corridor.wad")
         game.init()
         possible_actions = np.identity(6,dtype=int).tolist()
-        possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]])
+#         possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]])
+
+    elif scenario == 'defend_the_center':
+        game.load_config("scenarios/defend_the_center.cfg")
+        game.set_doom_scenario_path("scenarios/defend_the_center.wad")
+        game.init()
+        left = [1, 0, 0]
+        right = [0, 1, 0]
+        shoot = [0, 0, 1]
+        possible_actions = [left, right, shoot]
 
     if enhance == 'none':
         model = DQNetwork(out = len(possible_actions))
