@@ -171,25 +171,28 @@ class Worker():
         Print episode statistics depending on the scenario.
         
         """
-        if params.scenario=='deadly_corridor':
-            print('{}, health: {}, kills:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, np.maximum(0,self.last_total_health), self.last_total_kills, self.episode_count,
-                            self.episode_reward, self.episode_step_count, self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
-            
+        
         if params.scenario=='basic':
-            print('{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.episode_count, self.episode_reward, self.episode_step_count, 
-                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
+            print('{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
+                            self.name, self.episode_count, self.episode_reward, self.episode_curiosity, self.episode_reward/self.episode_step_count, 
+                            self.episode_curiosity/self.episode_step_count, self.episode_step_count, time.time()-self.episode_st))
+        
+        if params.scenario=='deadly_corridor':
+            print('{}, health: {}, kills:{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
+                            self.name, np.maximum(0,self.last_total_health), self.last_total_kills, self.episode_count,
+                            self.episode_reward, self.episode_curiosity, self.episode_reward/self.episode_step_count, 
+                            self.episode_curiosity/self.episode_step_count, self.episode_step_count, time.time()-self.episode_st))
         
         if params.scenario=='defend_the_center':
-            print('{}, kills:{}, episode #{}, ep_reward: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_step_count, 
-                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
+            print('{}, kills:{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
+                            self.name, self.last_total_kills, self.episode_count, self.episode_reward, self.episode_curiosity, 
+                            self.episode_reward/self.episode_step_count, self.episode_curiosity/self.episode_step_count, 
+                            self.episode_step_count, , time.time()-self.episode_st))
                           
         if params.scenario=='my_way_home':
-            print('{}, episode #{}, ep_reward: {}, ep_curiosity: {}, steps:{}, av_reward:{}, time costs:{}'.format(
-                            self.name, self.episode_count, self.episode_reward, self.episode_curiosity, self.episode_step_count, 
-                            self.episode_reward/self.episode_step_count, time.time()-self.episode_st))
+            print('{}, episode #{}, ep_reward: {}, ep_curiosity: {}, av_reward:{}, av_curiosity:{}, steps:{}, time costs:{}'.format(
+                            self.name, self.episode_count, self.episode_reward, self.episode_curiosity, self.episode_reward/self.episode_step_count, 
+                            self.episode_curiosity/self.episode_step_count, self.episode_step_count, time.time()-self.episode_st))
              
     
     def get_health_reward(self):
