@@ -15,7 +15,7 @@ We applied value based methods such as DQN, DRQN, DDQN, and DDDQN with prioritiz
 You can see our agent playing deadly corridor scenario below after training with an A3C algorithm : 
 
 <p align="center">
-<img align="center" src="A3C/saves/gifs/deadly_corridor_5.gif"/>
+<img align="center" src="A3C/gifs/deadly_corridor_5.gif"/>
 </p>
 
 
