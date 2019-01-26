@@ -97,10 +97,8 @@ env.bak/
 venv.bak/
 
 # Models saves
-saves/model/
-A3C/saves/model/
-saves/frames/
-A3C/saves/frames/
+saves/*
+saves/
 
 # Spyder project settings
 .spyderproject
