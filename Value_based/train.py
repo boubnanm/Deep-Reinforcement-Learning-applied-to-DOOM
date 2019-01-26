@@ -30,7 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     game, possible_actions = create_environment(scenario = args.scenario, window = args.window)
     agent = Agent(possible_actions, args.scenario, memory = args.memory_type, max_size = args.memory_size, stack_size = args.stack_size, 
-                 batch_size = args.batch_size)
+                 batch_size = args.batch_size, resize = args.resize)
     agent.train(game, total_episodes = args.total_episodes, pretrain = args.pretrain, frame_skip = args.frame_skip, enhance = args.enhance, lr = args.lr, max_tau = args.max_tau, explore_start = args.explore_start, explore_stop = args.explore_stop, decay_rate = args.decay_rate, gamma = args.gamma, freq = args.freq, init_zeros = args.init_zeros)
 
 
