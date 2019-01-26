@@ -31,7 +31,7 @@ def create_environment(scenario = 'basic', window = False):
     
     Parameters
     ---------------
-    scenario : String, either 'basic' or 'deadly_corridor', the Doom scenario to use (default='basic')
+    scenario : String, either 'basic' or 'deadly_corridor' or 'defend_the_center', the Doom scenario to use (default='basic')
     window   : Boolean, whether to render the window of the game or not (default=False)
     
     Returns
@@ -62,7 +62,17 @@ def create_environment(scenario = 'basic', window = False):
         game.set_doom_scenario_path("deadly_corridor.wad")
         game.init()
         possible_actions = np.identity(6,dtype=int).tolist()
-        possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]])
+#         possible_actions.extend([[0, 0, 1, 0, 1, 0], [0, 0, 1, 0, 0, 1]]) # Composed actions need some work
+        
+    elif scenario == 'defend_the_center':
+        game.load_config("scenarios/defend_the_center.cfg")
+        game.set_doom_scenario_path("scenarios/defend_the_center.wad")
+        game.init()
+        left = [1, 0, 0]
+        right = [0, 1, 0]
+        shoot = [0, 0, 1]
+        possible_actions = [left, right, shoot]
+#         possible_actions.extend([[1, 0, 1], [0, 1, 1]]) # Composed actions need some work
     
     return game, possible_actions
        

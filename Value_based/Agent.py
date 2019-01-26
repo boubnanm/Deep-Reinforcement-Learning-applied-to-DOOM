@@ -36,6 +36,34 @@ class Agent:
         self.scenario = scenario
         self.batch_size = batch_size
         self.resize = resize
+        
+    def get_reward(self, variables_cur, variables_prev):
+        """
+        Description
+        --------------
+        Reward reshaping
+        
+        Parameters
+        --------------
+        variables_cur  : dict, dictionnary containing current variables (kills, health and ammo.
+        variables_prev : dict, dictionnary containing previous variables (kills, health and ammo.
+        
+        Returns
+        --------------
+        Float, a reshaped reward.
+        """
+        
+        r = 0
+#         if self.scenario == 'defend_the_center':
+        r += variables_cur['kills'] - variables_prev['kills']
+        if variables_cur['ammo'] < variables_prev['ammo']:
+            r -= 0.1
+
+        if variables_cur['health'] < variables_prev['health']:
+            r -= 0.1
+                
+        return r
+        
             
     def train(self, game, total_episodes = 100, pretrain = 100, frame_skip = 4, enhance = 'none', lr = 1e-4, max_tau = 100, 
                      explore_start = 1.0, explore_stop = 0.01, decay_rate = 0.0001, gamma = 0.99, freq = 50, init_zeros = False):
@@ -63,12 +91,25 @@ class Agent:
         
         # Pretraining phase
         game.new_episode()
+        # Initialize current and previous game variables dictionnaries
+        variables_cur = {'kills' : game.get_game_variable(KILLCOUNT), 'health' : game.get_game_variable(HEALTH), 
+                        'ammo' : game.get_game_variable(AMMO0)}
+        variables_prev = variables_cur.copy()
+        # Get 1st state
         state = get_state(game)
         stacked_frames = deque([torch.zeros(self.resize, dtype=torch.int) for i in range(self.stack_size)], maxlen = self.stack_size)
         state, stacked_frames = stack_frames(stacked_frames, state, True, self.stack_size, self.resize)
         for i in range(pretrain):
+            # Get action and reward
             action = random.choice(self.possible_actions)
             reward = game.make_action(action, frame_skip)
+            # Update the game vaiables dictionnaries and get the reshaped reward
+            variables_cur['kills'] = game.get_game_variable(KILLCOUNT)
+            variables_cur['health'] = game.get_game_variable(HEALTH)
+            variables_cur['ammo'] = game.get_game_variable(AMMO0)
+            reward += self.get_reward(variables_cur, variables_prev)
+            variables_prev = variables_cur.copy()
+            # Put reward and action in tensor form
             reward = torch.tensor([reward], dtype = torch.float)
             action = torch.tensor([action], dtype = torch.float)
             done = game.is_episode_finished()
