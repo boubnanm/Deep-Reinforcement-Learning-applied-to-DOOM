@@ -103,8 +103,6 @@ def update_target_graph(from_scope,to_scope):
 
 # Processes Doom screen image to produce cropped and resized image. 
 def process_frame(frame, crop, resize):
-    #s = frame[30:-35,20:-20]
-    #s = scipy.misc.imresize(s,[80,128])
     y2, y1, x1, x2 = crop
     s = frame[y2:y1,x1:x2]
     s = scipy.misc.imresize(s,list(resize))
@@ -126,14 +124,13 @@ def normalized_columns_initializer(std=1.0):
     
 #This code allows gifs to be saved of the training episode for use in the Control Center.
 def make_gif(images, fname, fps=30):
-    
+
     def make_frame(t):
         try:
             x = images[int(fps*t)]
         except:
             x = images[-1]
         return x.astype(np.uint8)
-
+    myfps = fps
     clip = mpy.VideoClip(make_frame, duration=len(images)/fps)
-
-    clip.write_gif(fname, fps=fps, verbose=False)
+    clip.write_gif(fname, fps = 30)
