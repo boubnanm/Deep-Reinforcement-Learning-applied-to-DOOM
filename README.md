@@ -12,7 +12,7 @@ This project, done by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaou
 
 We applied value based methods such as DQN, DRQN, DDQN, and DDDQN with prioritized experience replay, and hybrid algorithms such as A3C and Curiosity. You can find our paper detailing our work in this repository.
 
-The following gif shows our agent playing deadly corridor scenario after training with an A3C algorithm : 
+The following gif shows our agent playing deadly corridor and defend the center scenarios after training with an A3C algorithm : 
 
 <p align="center">
 <img align="center" src="A3C_Curiosity/gifs/deadly_corridor_5.gif"/>
