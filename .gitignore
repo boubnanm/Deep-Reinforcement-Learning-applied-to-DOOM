@@ -32,7 +32,8 @@ saves/frames/
 A3C/saves/play_gifs/
 saves/play_gifs/
 A3C/*.ipynb
-A3C/saves/
+A3C/*.ini
+Value_based/*.ini
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
