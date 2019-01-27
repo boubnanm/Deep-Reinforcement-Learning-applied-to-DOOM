@@ -15,8 +15,8 @@ We applied value based methods such as DQN, DRQN, DDQN, and DDDQN with prioritiz
 The following gif shows our agent playing deadly corridor and defend the center scenarios after training with an A3C algorithm : 
 
 <p align="center">
-<img align="center" src="A3C_Curiosity/gifs/deadly_corridor_5.gif"/>
-<img align="center" src="A3C_Curiosity/gifs/defend_the_center_1.gif"/>
+<img align="center" src="A3C_Curiosity/gifs/deadly_corridor.gif"/>
+<img align="center" src="A3C_Curiosity/gifs/defend_the_center.gif"/>
 </p>
 
 
