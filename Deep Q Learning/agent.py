@@ -99,7 +99,7 @@ class Agent:
         """
         
         # Setting tensorboadX and variables of interest
-        writer = SummaryWriter()
+        writer = SummaryWriter(log_dir = 'runs/' + self.scenario)
         kill_count = np.zeros(10) # This list will contain kill counts of each 10 episodes in order to compute moving average
         ammo = np.zeros(10) # This list will contain ammo of each 10 episodes in order to compute moving average
         rewards = np.zeros(10) # This list will contain rewards of each 10 episodes in order to compute moving average
@@ -216,10 +216,10 @@ class Agent:
                     losses[episode%10] = loss
                     # Update writer
                     if (episode > 0) and (episode%10 == 0):
-                        writer.add_scalar('kills', kill_count.mean(), episode)
-                        writer.add_scalar('ammo', ammo.mean(), episode)
-                        writer.add_scalar('reward', rewards.mean(), episode)
-                        writer.add_scalar('loss', losses.mean(), episode)
+                        writer.add_scalar('Game variables/Kills', kill_count.mean(), episode)
+                        writer.add_scalar('Game variables/Ammo', ammo.mean(), episode)
+                        writer.add_scalar('Reward Loss/Reward', rewards.mean(), episode)
+                        writer.add_scalar('Reward Loss/loss', losses.mean(), episode)
 
                 else:
                     # Get the next state

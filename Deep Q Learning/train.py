@@ -1,5 +1,5 @@
 import argparse
-from Agent import *
+from agent import *
 
 if __name__ == '__main__':
 
