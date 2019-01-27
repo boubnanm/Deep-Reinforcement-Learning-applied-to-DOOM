@@ -2,6 +2,7 @@ from utils import *
 from memory import *
 from models import *
 from collections import namedtuple
+from tensorboardX import SummaryWriter
 
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'next_state', 'dones'))
 
@@ -97,6 +98,12 @@ class Agent:
         init_zeros         : Boolean, whether to initialize the weights to zero or not.
         """
         
+        # Setting tensorboadX and variables of interest
+        writer = SummaryWriter()
+        kill_count = np.zeros(10) # This list will contain kill counts of each 10 episodes in order to compute moving average
+        ammo = np.zeros(10) # This list will contain ammo of each 10 episodes in order to compute moving average
+        rewards = np.zeros(10) # This list will contain rewards of each 10 episodes in order to compute moving average
+        losses = np.zeros(10) # This list will contain losses of each 10 episodes in order to compute moving average
         # Pretraining phase
         game.new_episode()
         # Initialize current and previous game variables dictionnaries
@@ -118,7 +125,7 @@ class Agent:
             reward += self.get_reward(variables_cur, variables_prev)
             variables_prev = variables_cur.copy()
             # Put reward and action in tensor form
-            reward = torch.tensor([reward/10], dtype = torch.float)
+            reward = torch.tensor([reward], dtype = torch.float)
             action = torch.tensor([action], dtype = torch.float)
             done = game.is_episode_finished()
             if done:
@@ -189,8 +196,8 @@ class Agent:
                 # Check if the episode is done
                 done = game.is_episode_finished()
                 # Add the reward to total reward
-                episode_rewards.append(reward/10)
-                reward = torch.tensor([reward/10], dtype = torch.float)
+                episode_rewards.append(reward)
+                reward = torch.tensor([reward], dtype = torch.float)
                 action = torch.tensor([action], dtype = torch.float)
                 if done:
                     next_state = np.zeros((240, 320), dtype='uint8')[:, :, None]
@@ -202,6 +209,17 @@ class Agent:
                               'Explore P: {:.4f}'.format(explore_probability))
                     # Add experience to the replay buffer
                     self.memory.add((state, action, reward, next_state, torch.tensor([not done], dtype = torch.float)))
+                    # Add number of kills and ammo variables
+                    kill_count[episode%10] = game.get_game_variable(KILLCOUNT)
+                    ammo[episode%10] = game.get_game_variable(AMMO2)
+                    rewards[episode%10] = total_reward
+                    losses[episode%10] = loss
+                    # Update writer
+                    if (episode > 0) and (episode%10 == 0):
+                        writer.add_scalar('kills', kill_count.mean(), episode)
+                        writer.add_scalar('ammo', ammo.mean(), episode)
+                        writer.add_scalar('reward', rewards.mean(), episode)
+                        writer.add_scalar('loss', losses.mean(), episode)
 
                 else:
                     # Get the next state
@@ -243,14 +261,16 @@ class Agent:
                 if tau > max_tau:
                     # Update the parameters of our target_dqn_model with DQN_weights
                     update_target(dqn_model, target_dqn_model)
+                    print('model updated')
                     tau = 0
                     
-            if ((episode + 1) % (freq + 1)) == 0: # +1 just to avoid the conditon episode != 0
+            if (episode % freq) == 0: # +1 just to avoid the conditon episode != 0
                 model_file = 'weights/' + self.scenario + '/' + enhance + '_' + str(episode) + '.pth'
                 torch.save(dqn_model.state_dict(), model_file)
                 print('\nSaved model to ' + model_file)
-                    
-                    
+        
+        writer.export_scalars_to_json("./all_scalars.json")
+        writer.close()
                     
                     
                     
