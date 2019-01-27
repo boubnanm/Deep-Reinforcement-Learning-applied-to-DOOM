@@ -123,7 +123,7 @@ def normalized_columns_initializer(std=1.0):
 
     
 #This code allows gifs to be saved of the training episode for use in the Control Center.
-def make_gif(images, fname, fps=30):
+def make_gif(images, fname, fps=50):
 
     def make_frame(t):
         try:
@@ -133,4 +133,5 @@ def make_gif(images, fname, fps=30):
         return x.astype(np.uint8)
     myfps = fps
     clip = mpy.VideoClip(make_frame, duration=len(images)/fps)
-    clip.write_gif(fname, fps = 30)
+    clip.fps = fps
+    clip.write_gif(fname, program='ffmpeg', fuzz=50, verbose=False)
