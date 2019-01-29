@@ -122,7 +122,6 @@ def normalized_columns_initializer(std=1.0):
     return _initializer
 
     
-#This code allows gifs to be saved of the training episode for use in the Control Center.
 def make_gif(images, fname, fps=50):
 
     def make_frame(t):

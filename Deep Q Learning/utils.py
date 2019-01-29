@@ -77,7 +77,7 @@ def create_environment(scenario = 'basic', window = False):
     return game, possible_actions
        
 
-def test_environment(weights, scenario = 'basic', window = False, total_episodes = 100, enhance = 'none', frame_skip = 2):
+def test_environment(weights, scenario = 'basic', window = False, total_episodes = 100, enhance = 'none', frame_skip = 2, stack_size = 4):
     """
     Description
     ---------------
@@ -99,6 +99,7 @@ def test_environment(weights, scenario = 'basic', window = False, total_episodes
     """
     
     game = DoomGame()
+    game.set_screen_format(ScreenFormat.RGB24)
     if window:
         game.set_window_visible(True)
         
@@ -132,15 +133,15 @@ def test_environment(weights, scenario = 'basic', window = False, total_episodes
         possible_actions = [left, right, shoot]
 
     if enhance == 'none':
-        model = DQNetwork(out = len(possible_actions))
+        model = DQNetwork(stack_size = stack_size, out = len(possible_actions))
         if use_cuda:
             model.cuda()
 
     elif enhance == 'dueling':
-        model = DDDQNetwork(out = len(possible_actions))
+        model = DDDQNetwork(stack_size = stack_size, out = len(possible_actions))
         if use_cuda:
             model.cuda()
-
+            
     # Load the weights of the model
     state_dict = torch.load(weights)
     model.load_state_dict(state_dict)
@@ -159,12 +160,17 @@ def test_environment(weights, scenario = 'basic', window = False, total_episodes
                 q = model(state)
 
             action = possible_actions[int(torch.max(q, 1)[1][0])]
+#             action, explore_probability = predict_action(1, 0.01, 0.0001, 1e6, state.cuda(), model, possible_actions)
             reward = game.make_action(action, frame_skip)
             done = game.is_episode_finished()
+            if not done:
+                state = get_state(game)
+                state, stacked_frames = stack_frames(stacked_frames, state, False, in_channels)
+                
             time.sleep(0.02)
             
         print ("Total reward:", game.get_total_reward())
-        time.sleep(2)
+        time.sleep(0.1)
         
     game.close()
 
@@ -355,6 +361,22 @@ def update_target(current_model, target_model):
     """
     target_model.load_state_dict(current_model.state_dict())
 
+
+"""
+Make gif
+"""
+def make_gif(images, fname, fps=50):
+
+    def make_frame(t):
+        try:
+            x = images[int(fps*t)]
+        except:
+            x = images[-1]
+        return x.astype(np.uint8)
+    myfps = fps
+    clip = mpy.VideoClip(make_frame, duration=len(images)/fps)
+    clip.fps = fps
+    clip.write_gif(fname, program='ffmpeg', fuzz=50, verbose=False)
 
 
 

@@ -82,13 +82,14 @@ class DDDQNetwork(nn.Module):
         super(DDDQNetwork, self).__init__()
         
         # Conv Module
-        self.conv_1 = nn.Conv2d(in_channels = stack_size, out_channels = 32, kernel_size = 8, stride = 4)
-        self.conv_2 = nn.Conv2d(in_channels = 32, out_channels = 64, kernel_size = 4, stride = 2)
+        self.conv_1 = nn.Conv2d(in_channels = stack_size, out_channels = 32, kernel_size = 8, stride = 2, padding = 3)
+        self.conv_2 = nn.Conv2d(in_channels = 32, out_channels = 32, kernel_size = 5, stride = 1, padding = 2)
 #         self.conv_3 = nn.Conv2d(in_channels = 64, out_channels = 64, kernel_size = 5, stride = 2)
         
-        convw = conv2d_size_out(conv2d_size_out(w, 8, 4), 4, 2) # width of last conv output
-        convh = conv2d_size_out(conv2d_size_out(h, 8, 4), 4, 2) # height of last conv output
-        linear_input_size = convw * convh * 64
+#         convw = conv2d_size_out(conv2d_size_out(w, 8, 4), 4, 2) # width of last conv output
+#         convh = conv2d_size_out(conv2d_size_out(h, 8, 4), 4, 2) # height of last conv output
+#         linear_input_size = convw * convh * 64
+        linear_input_size = 30 * 40 * 32
         
         # Value Module
         self.value_fc_1 = nn.Linear(linear_input_size, 512)
@@ -105,7 +106,7 @@ class DDDQNetwork(nn.Module):
             # Initialize conv module layers to 0
             nn.init.constant_(self.conv_1.weight, 0.0)
             nn.init.constant_(self.conv_2.weight, 0.0)
-            nn.init.constant_(self.conv_3.weight, 0.0)
+#             nn.init.constant_(self.conv_3.weight, 0.0)
             
             # Initialize value module layers to 0
             nn.init.constant_(self.value_fc_1.weight, 0.0)
@@ -119,7 +120,7 @@ class DDDQNetwork(nn.Module):
         
     def forward(self, x):
         x = F.relu(self.conv_1(x))
-        x = F.relu(self.conv_2(x))
+        x = F.max_pool2d(F.relu(self.conv_2(x)), kernel_size = 2, stride = 2)        
 #         x = F.relu(self.conv_3(x))
         x_flat = x.view(x.size(0), -1)
         

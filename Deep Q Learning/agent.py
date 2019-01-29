@@ -125,7 +125,7 @@ class Agent:
             reward += self.get_reward(variables_cur, variables_prev)
             variables_prev = variables_cur.copy()
             # Put reward and action in tensor form
-            reward = torch.tensor([reward], dtype = torch.float)
+            reward = torch.tensor([reward/100], dtype = torch.float)
             action = torch.tensor([action], dtype = torch.float)
             done = game.is_episode_finished()
             if done:
@@ -151,16 +151,16 @@ class Agent:
         # Exploration-Exploitation phase
         decay_step = 0
         if enhance == 'none':
-            dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
-            target_dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
+            dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions), stack_size = self.stack_size)
+            target_dqn_model = DQNetwork(init_zeros = init_zeros, out = len(self.possible_actions), stack_size = self.stack_size)
             if use_cuda:
                 print("End of trainig phase: The screen might be frozen now, don't worry, models take some time to be loaded on GPU")
                 dqn_model.cuda()
                 target_dqn_model.cuda()
 
         elif enhance == 'dueling':
-            dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
-            target_dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions))
+            dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions), stack_size = self.stack_size)
+            target_dqn_model = DDDQNetwork(init_zeros = init_zeros, out = len(self.possible_actions), stack_size = self.stack_size)
             if use_cuda:
                 print("End of trainig phase: The screen might be frozen now, don't worry, models take some time to be loaded on GPU")
                 dqn_model.cuda()
@@ -196,8 +196,8 @@ class Agent:
                 # Check if the episode is done
                 done = game.is_episode_finished()
                 # Add the reward to total reward
-                episode_rewards.append(reward)
-                reward = torch.tensor([reward], dtype = torch.float)
+                episode_rewards.append(reward/100)
+                reward = torch.tensor([reward/100], dtype = torch.float)
                 action = torch.tensor([action], dtype = torch.float)
                 if done:
                     next_state = np.zeros((240, 320), dtype='uint8')[:, :, None]
