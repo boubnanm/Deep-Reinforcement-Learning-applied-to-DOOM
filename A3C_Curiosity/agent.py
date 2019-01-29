@@ -498,12 +498,23 @@ class Worker():
         
         print("Playing",episode_num,"episodes..")
         
+        # Saving GIF freq
+        freq_gif = 5
+        
+        # Initialize frames buffer to save gifs
+        episode_frames = []
+        
         for i in range(episode_num):
             print("Launching episode",i+1)
             time.sleep(3)
             
-            # Initialize frames buffer to save gifs
-            episode_frames = []
+            # Reinitialize frames buffer to save gifs
+            if params.scenario=="basic":
+                freq_gif = 10
+                if (i+1)%freq_gif ==0:
+                    episode_frames = []
+            else:
+                episode_frames = []
             
             # Begin episode
             self.env.new_episode()
@@ -543,7 +554,7 @@ class Worker():
             print('Time cost: {}'.format(time.time() - s_t))
             
             # Periodically save gif
-            if (i+1)%5==0 or i==0:
+            if (i+1)%freq_gif==0 or i==0:
                 print("Saving episode GIF..")
                 images = np.array(episode_frames)
                 gif_file = os.path.join(params.gif_path,params.scenario+"_"+str(i+1)+".gif")
