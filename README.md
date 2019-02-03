@@ -2,7 +2,9 @@
 
 This is the final project for the Reinforcement Learning Course of the 2018/2019 MVA Master class.
 
+<div style="text-align: justify"> your-text-here 
 This project is carried by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaouki](https://github.com/Chaoukia), and it consists on training an agent to play in different scenarios of the game DOOM with deep reinforcement learning methods from Deep Q learning and its enhancements like double Q learning, deep recurrent network (with LSTM), deep dueling architecture and prioritized replay to Asynchronous Advantage Actor-Crotique (A3C) and curiosity-driven learning. You can take a look at our paper **Deep reinforcement learning applied to Doom.pdf** for more details about the algorithms and some empirical results.
+</div>
 
 Here are two examples of agents trained with A3C.
 <p align="center">
