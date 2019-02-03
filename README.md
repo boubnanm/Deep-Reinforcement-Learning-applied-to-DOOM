@@ -2,9 +2,10 @@
 
 This is the final project for the Reinforcement Learning Course of the 2018/2019 MVA Master class.
 
-<div style="text-align: justify"> your-text-here 
-This project is carried by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaouki](https://github.com/Chaoukia), and it consists on training an agent to play in different scenarios of the game DOOM with deep reinforcement learning methods from Deep Q learning and its enhancements like double Q learning, deep recurrent network (with LSTM), deep dueling architecture and prioritized replay to Asynchronous Advantage Actor-Crotique (A3C) and curiosity-driven learning. You can take a look at our paper **Deep reinforcement learning applied to Doom.pdf** for more details about the algorithms and some empirical results.
-</div>
+This project is carried by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaouki](https://github.com/Chaoukia). It consists on training an agent to play in different scenarios of the game DOOM with deep reinforcement learning methods from Deep Q learning and its enhancements like double Q learning, deep recurrent network (with LSTM), deep dueling architecture and prioritized replay to Asynchronous Advantage Actor-Critic (A3C) and Curiosity-Driven learning. 
+
+You can take a look at our paper **[Deep reinforcement learning applied to Doom](https://github.com/Swirler/Deep-Reinforcement-Learning-applied-to-DOOM/blob/master/Deep%20reinforcement%20learning%20applied%20to%20Doom.pdf)** for more details about the algorithms and some empirical results.
+>>>>>>> e98fdc4744c016fbd7008c87560d66773cb70d83
 
 Here are two examples of agents trained with A3C.
 <p align="center">
@@ -16,8 +17,8 @@ Here are two examples of agents trained with A3C.
 
 ### Prerequisites
 
-- Operating system enbaling the installation of VizDoom (there are some building problems with Ubuntu 16.04 for example), we use Ubuntu 18.04.
-- NVIDIA GPU + CUDA CuDNN (for optimal performance for deep Q learning methods).
+- Operating system enabling the installation of VizDoom (there are some building problems with Ubuntu 16.04 for example), we use Ubuntu 18.04.
+- NVIDIA GPU + CUDA and CuDNN (for optimal performance for deep Q learning methods).
 - Python 3.6 (in order to install tensorflow).
 
 ### Installation
@@ -94,6 +95,12 @@ cd "A3C_Curiosity"
     ```
     python main.py --scenario basic --actions single --num_workers 12 --max_episodes 1200
     ```
+  
+    - Deadly corridor with default parameters with curiosity: 
+    ```
+    python main.py --use_curiosity --scenario deadly_corridor --actions all --num_workers 12 --max_episodes 1600
+    ```
+
 See utils/args.py for more parameters.
 
 ### Testing
@@ -101,7 +108,7 @@ See utils/args.py for more parameters.
 - You can use the following command to view your agent playing using the last trained model:
 
 ```
-python main.py --play --scenario deadly --actions all --play_episodes 10
+python main.py --play --scenario deadly_corridor --actions all --play_episodes 10
 ```
 
 
