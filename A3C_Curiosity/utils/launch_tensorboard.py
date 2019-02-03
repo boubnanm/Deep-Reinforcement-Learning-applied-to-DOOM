@@ -17,8 +17,6 @@ for worker in range(num_workers):
     launcher+='worker_'+str(worker)+':train_'+str(worker)+'/,'
 
 
-
-#time.sleep(5)
 if __name__ == '__main__':
     os.system(launcher)
     time.sleep(3)

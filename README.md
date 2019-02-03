@@ -1,11 +1,5 @@
 # Deep Reinforcement learning Applied to DOOM.
 
-<p align="center">
-  <b>[UNDER CONSTRUCTION]</b>
-  <br><br>
-  <img src="https://fr.seaicons.com/wp-content/uploads/2015/11/Transport-Under-Construction-icon.png" width="128" height="128"/>
-</p>
-
 This is the final project for the Reinforcement Learning Course of the 2018/2019 MVA Master class.
 
 This project is carried by [Mehdi Boubnan](https://github.com/Swirler) & [Ayman Chaouki](https://github.com/Chaoukia), and it consists on training an agent to play in different scenarios of the game DOOM with deep reinforcement learning methods from Deep Q learning and its enhancements like double Q learning, deep recurrent network (with LSTM), deep dueling architecture and prioritized replay to Asynchronous Advantage Actor-Crotique (A3C) and curiosity-driven learning. You can take a look at our paper **Deep reinforcement learning applied to Doom.pdf** for more details about the algorithms and some empirical results.
@@ -36,6 +30,10 @@ conda install pytorch torchvision -c pytorch
 ```
 pip install tensorboard
 pip install tensorboardX
+```
+- Install moviepy.
+```
+pip install moviepy
 ```
 - Clone this repo
 ```
@@ -71,14 +69,37 @@ python train.py --scenario basic --window 1 --batch_size 32 --total_episodes 100
 python play.py --scenario basic --window 1 --weights weights/none_19.pth --total_episodes 20 --frame_skip 2
 ```
 
+## A3C & Curiosity
+
+```
+cd "A3C_Curiosity"
+```
+
+### Repositories
+
+- scenarios : Configurations and .wad files of the following scenarios (basic, deadly corridor, defend the center, defend the line and my way home).
+- saves   : Models, tensorboad summaries and workers gifs during training will be saved here.
+
+### Training
+
+- You can view training rewards, game variables and loss plots by running ```python utils/launch_tensorboard.py```
+- Train a model with main.py , for example:
+    - Deadly corridor with default parameters : 
+    ```
+    python main.py --scenario deadly_corridor --actions all --num_workers 12 --max_episodes 1600
+    ```
+    - Basic with default parameters : 
+    ```
+    python main.py --scenario basic --actions single --num_workers 12 --max_episodes 1200
+    ```
+See utils/args.py for more parameters.
+
+### Testing
+
+- You can use the following command to view your agent playing using the last trained model:
+
+```
+python main.py --play --scenario deadly --actions all --play_episodes 10
+```
 
 
-
-### Progress
-- [x] Add paper to the repository.
-- [x] Add A3C code.
-- [x] Clean A3C code.
-- [x] Add deep q learning code.
-- [x] Clean deep q learning code.
-- [x] Add packages requirements.
-- [ ] Add instructions to run code.
