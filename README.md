@@ -94,7 +94,10 @@ cd "A3C_Curiosity"
     ```
     python main.py --scenario basic --actions single --num_workers 12 --max_episodes 1200
     ```
-  
+    - Deadly corridor with default parameters with PPO: 
+    ```
+    python main.py --use_ppo --scenario deadly_corridor --actions all --num_workers 12 --max_episodes 1600
+    ```
     - Deadly corridor with default parameters with curiosity: 
     ```
     python main.py --use_curiosity --scenario deadly_corridor --actions all --num_workers 12 --max_episodes 1600
