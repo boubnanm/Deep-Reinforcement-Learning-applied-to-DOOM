@@ -63,7 +63,7 @@ class AC_Network():
                                               weights_initializer=normalized_columns_initializer(1.0),
                                               biases_initializer=None)
             
-            # Only workers networks needs loss functions and gradient updating when training.
+            # Only workers networks need loss functions and gradient updating when training.
             if (scope != 'global') and (not as_player):
                 
                 #Variables for loss functions
@@ -71,12 +71,25 @@ class AC_Network():
                 self.actions_onehot = tf.one_hot(self.actions,a_size,dtype=tf.float32)
                 self.target_v = tf.placeholder(shape=[None],dtype=tf.float32)
                 self.advantages = tf.placeholder(shape=[None],dtype=tf.float32)
+                
+                self.old_policy = tf.placeholder(shape=[None],dtype=tf.float32)
                 self.responsible_outputs = tf.reduce_sum(self.policy * self.actions_onehot, [1])
+                
+                if params.use_ppo:
+                    ratio = self.responsible_outputs / self.old_policy
+                    epsilon = 0.2
+                    surr1 = ratio * self.advantages
+                    surr2 = tf.clip_by_value(ratio, 1.0 - epsilon, 1.0 + epsilon) * self.advantages                
+                    policy_loss_ = tf.minimum(surr1, surr2)
+
+                else:
+                    policy_loss_ = tf.log(self.responsible_outputs)*self.advantages
+                    
 
                 #Loss functions
                 self.value_loss = 0.5 * tf.reduce_sum(tf.square(self.target_v - tf.reshape(self.value,[-1])))
                 self.entropy = - tf.reduce_sum(self.policy * tf.log(self.policy))
-                self.policy_loss = -tf.reduce_sum(tf.log(self.responsible_outputs)*self.advantages)
+                self.policy_loss = -tf.reduce_sum(policy_loss_)
                 self.loss = 0.5 * self.value_loss + self.policy_loss - self.entropy * 0.01
 
                 #Get gradients from local network using local losses

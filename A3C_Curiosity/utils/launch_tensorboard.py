@@ -6,10 +6,10 @@ import time
 
 params = parse_arguments()
 
-if params.num_processes==-1:
+if params.num_workers==-1:
     num_workers = multiprocessing.cpu_count() # Set workers to number of available CPU threads
 else:
-    num_workers = params.num_processes
+    num_workers = params.num_workers
 
 launcher = 'tensorboard --logdir='
 

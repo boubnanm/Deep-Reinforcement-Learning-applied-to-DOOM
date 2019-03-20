@@ -311,6 +311,10 @@ class Worker():
                      self.local_AC.state_in[0]:self.batch_rnn_state[0],
                      self.local_AC.state_in[1]:self.batch_rnn_state[1]}
         
+        if params.use_ppo:
+            old_policy = sess.run([self.local_AC.responsible_outputs],feed_dict=feed_dict)
+            feed_dict.update({self.local_AC.old_policy:old_policy[0]})
+        
         self.v_l,self.p_l,self.e_l,self.g_n,self.v_n, self.batch_rnn_state,_ = sess.run([self.local_AC.value_loss,
                                                                                          self.local_AC.policy_loss,
                                                                                          self.local_AC.entropy,
@@ -319,8 +323,9 @@ class Worker():
                                                                                          self.local_AC.state_out,
                                                                                          self.local_AC.apply_grads],
                                                                                         feed_dict=feed_dict)
-        Losses = [self.v_l,self.p_l,self.e_l]
-        Grad_vars = [self.g_n,self.v_n]
+        
+        Losses = [self.v_l, self.p_l, self.e_l]
+        Grad_vars = [self.g_n, self.v_n]
         
         # Update the local ICM network using gradients from loss
         if params.use_curiosity:

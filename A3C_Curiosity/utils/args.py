@@ -23,7 +23,8 @@ def parse_arguments():
     parser.add_argument("--freq_model_save", type=int, default=200, help="Frequence of episodes to save model")
     parser.add_argument("--freq_gif_save", type=int, default=25, help="Frequence of episodes to save gifs")
     parser.add_argument("--freq_summary", type=int, default=5, help="Frequence of episodes to save gifs")
-    parser.add_argument("--use_curiosity", action="store_true", help="Frequence of episodes to save gifs")
+    parser.add_argument("--use_curiosity", action="store_true", help="Use curiosity")
+    parser.add_argument("--use_ppo", action="store_true", help="Use PPO")
     parser.add_argument("--no_render", action="store_true", help="Disable window game while training")
     parser.add_argument("--no_reward", action="store_true", help="Disable extrinsic reward")
 
@@ -34,6 +35,12 @@ def parse_arguments():
     game_args.frames_path += "/"+game_args.scenario
     game_args.summary_path += "/"+game_args.scenario
     game_args.gif_path += "/"+game_args.scenario
+    
+    if game_args.use_ppo:
+        game_args.model_path += "_ppo"
+        game_args.frames_path += "_ppo"
+        game_args.summary_path += "_ppo"
+        game_args.gif_path += "_ppo"
     
     if game_args.use_curiosity:
         game_args.model_path += "_curiosity"
